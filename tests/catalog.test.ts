@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import { after, afterEach, beforeEach, describe, it } from "node:test";
+import { after, afterEach, beforeEach, describe, it, mock } from "node:test";
 import { eq } from "drizzle-orm";
-import { fetchMissingCatalogDetails } from "@/lib/catalog";
+import { fetchMissingArtistDetails, fetchMissingCatalogDetails, upsertArtists } from "@/lib/catalog";
+import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
-import { artists, tracks, workerHeartbeat } from "@/lib/db/schema";
+import { artists, spotifyTokens, trackArtists, tracks, users, workerHeartbeat } from "@/lib/db/schema";
 import { saveImportedStreams } from "@/lib/import/save";
 import { fetchMissingPictures, findAlbumCover, findArtistPicture } from "@/lib/pictures";
-import { closeDatabase, createUser, resetDatabase, spotifyId, stubFetch } from "./helpers";
+import { refreshTopLists } from "@/lib/spotify/top";
+import { addPlay, addTrack, closeDatabase, createUser, resetDatabase, spotifyId, spotifyTrack, stubFetch } from "./helpers";
 
 const TRACK = spotifyId("t");
 
@@ -18,6 +20,7 @@ async function importOneTrack() {
     { playedAt: "2020-05-01T08:00:00.000Z", trackId: TRACK, msPlayed: 180_000, trackName: "Song", artistName: "Band", albumName: "Record" },
   ]);
   await db.insert(workerHeartbeat).values({ id: 1, beatAt: new Date() });
+  return user;
 }
 
 after(closeDatabase);
@@ -141,5 +144,125 @@ describe("pictures from Deezer", () => {
     assert.equal(await fetchMissingPictures(10), 2);
     stub.mock.restore();
     assert.equal(await fetchMissingPictures(10), 0, "nothing is looked up twice");
+  });
+});
+
+describe("Spotify's own artist photos", () => {
+  const REAL_ID = spotifyId("realartist");
+  const OTHER_ID = spotifyId("otherartist");
+  const PHOTO = "https://i.scdn.co/image/official";
+  const DEEZER_PICTURE = "https://cdn.example/images/artist/abc/500x500.jpg";
+  const band = (images: { url: string; width: number; height: number }[] = [{ url: PHOTO, width: 640, height: 640 }]) => ({
+    id: REAL_ID,
+    name: "Band",
+    images,
+  });
+  const artistRow = async (id: string) => (await db.select().from(artists).where(eq(artists.id, id)))[0];
+  const artistsOfTrack = async (trackId: string) =>
+    (await db.select().from(trackArtists).where(eq(trackArtists.trackId, trackId))).map((row) => row.artistId);
+
+  beforeEach(resetDatabase);
+
+  // An import whose made-up artist already got a picture from Deezer
+  async function importWithDeezerPicture() {
+    const user = await importOneTrack();
+    await db.update(artists).set({ imageUrl: DEEZER_PICTURE }).where(eq(artists.imported, true));
+    return user;
+  }
+
+  it("takes over a made-up artist from a top list, photo and plays", async () => {
+    await importWithDeezerPicture();
+    await upsertArtists([band()]);
+
+    assert.deepEqual(await artistsOfTrack(TRACK), [REAL_ID]);
+    const real = await artistRow(REAL_ID);
+    assert.equal(real.imageUrl, PHOTO);
+    assert.ok(real.detailsFetchedAt, "no lookup is needed anymore");
+    assert.equal((await db.select().from(artists).where(eq(artists.imported, true))).length, 0);
+  });
+
+  it("keeps the Deezer picture of an artist Spotify has no photo for", async () => {
+    await importWithDeezerPicture();
+    await upsertArtists([band([])]);
+    assert.equal((await artistRow(REAL_ID)).imageUrl, DEEZER_PICTURE);
+
+    await upsertArtists([band([])]);
+    assert.equal((await artistRow(REAL_ID)).imageUrl, DEEZER_PICTURE, "also once it's a real artist");
+  });
+
+  it("still asks Spotify about an artist Deezer has a picture for", async () => {
+    const user = await createUser();
+    await addTrack(TRACK, REAL_ID, "Band");
+    await addPlay(user.id, TRACK, "2020-05-01T08:00:00.000Z");
+
+    const deezer = stubFetch((url) =>
+      Response.json({ data: url.includes("/search/artist") ? [{ name: "Band", picture_big: DEEZER_PICTURE }] : [] }),
+    );
+    await fetchMissingPictures(10);
+    deezer.mock.restore();
+    assert.equal((await artistRow(REAL_ID)).imageUrl, DEEZER_PICTURE);
+
+    const spotify = stubFetch((url) => (url.includes("/v1/artists/") ? Response.json(band()) : undefined));
+    assert.equal(await fetchMissingArtistDetails(5), 1);
+    spotify.mock.restore();
+    assert.equal((await artistRow(REAL_ID)).imageUrl, PHOTO);
+  });
+
+  it("looks up the most played artists first", async () => {
+    const user = await createUser();
+    await addTrack(spotifyId("quiet"), OTHER_ID, "Quiet");
+    await addTrack(spotifyId("loud"), REAL_ID, "Band");
+    await addPlay(user.id, spotifyId("quiet"), "2020-05-01T08:00:00.000Z");
+    await addPlay(user.id, spotifyId("loud"), "2020-05-01T09:00:00.000Z");
+    await addPlay(user.id, spotifyId("loud"), "2020-05-01T10:00:00.000Z");
+
+    const stub = stubFetch((url) => (url.includes("/v1/artists/") ? Response.json(band()) : undefined));
+    await fetchMissingArtistDetails(1);
+    assert.ok(String(stub.mock.calls.at(-1)?.arguments[0]).endsWith(`/artists/${REAL_ID}`));
+    stub.mock.restore();
+  });
+
+  describe("top lists", () => {
+    async function connect(userId: string) {
+      await db.insert(spotifyTokens).values({
+        userId,
+        accessToken: encrypt("fake"),
+        refreshToken: encrypt("fake"),
+        expiresAt: new Date(Date.now() + 3_600_000),
+        scope: "user-top-read",
+      });
+    }
+
+    it("stores every range and links what was imported", async () => {
+      const user = await importWithDeezerPicture();
+      await connect(user.id);
+      const stub = stubFetch((url) => {
+        if (url.includes("/me/top/artists")) return Response.json({ items: [band()] });
+        if (url.includes("/me/top/tracks")) {
+          return Response.json({ items: [spotifyTrack(TRACK, { id: REAL_ID, name: "Band" }, { id: spotifyId("album"), name: "Record" })] });
+        }
+      });
+      await refreshTopLists(user.id);
+      assert.equal(stub.mock.callCount(), 6, "tracks and artists for three ranges");
+      stub.mock.restore();
+
+      assert.deepEqual(await artistsOfTrack(TRACK), [REAL_ID]);
+      assert.equal((await artistRow(REAL_ID)).imageUrl, PHOTO);
+      const [row] = await db.select().from(users).where(eq(users.id, user.id));
+      assert.ok(row.topListsFetchedAt);
+    });
+
+    it("lets a refusal pass, so syncing isn't paused for it", async () => {
+      const user = await importWithDeezerPicture();
+      await connect(user.id);
+      const logged = mock.method(console, "error", () => {});
+      const stub = stubFetch(() => Response.json({}, { status: 429, headers: { "retry-after": "86400" } }));
+      await assert.doesNotReject(refreshTopLists(user.id));
+      stub.mock.restore();
+      logged.mock.restore();
+
+      const [row] = await db.select().from(users).where(eq(users.id, user.id));
+      assert.ok(row.topListsFetchedAt, "waits for the next round");
+    });
   });
 });

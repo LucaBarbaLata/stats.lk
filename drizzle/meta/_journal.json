@@ -85,6 +85,13 @@
       "when": 1793812056203,
       "tag": "0011_recheck_artist_pictures",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793812841074,
+      "tag": "0012_spotify_artist_photos",
+      "breakpoints": true
     }
   ]
 }

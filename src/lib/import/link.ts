@@ -77,8 +77,8 @@ export async function linkImportedTracks(database: Database = db, trackIds?: str
 }
 
 // Moves everything from made-up artists to the real artists with the same
-// name, keeping what was already found for them. A picture counts as finding
-// the artist, so that Spotify's scarce lookups go to what's still unknown.
+// name, keeping what was already found for them. A real artist's own picture
+// wins, and one from Deezer stays only until Spotify's photo is looked up.
 export async function absorbImportedArtists(database: Database, realIds: string[]): Promise<void> {
   if (!realIds.length) return;
   const pairs = await database.execute<{ imported: string; real: string }>(sql`
@@ -106,8 +106,7 @@ export async function absorbImportedArtists(database: Database, realIds: string[
         image_url = coalesce(r.image_url, p.image_url),
         picture_looked_up_at = coalesce(r.picture_looked_up_at, p.picture_looked_up_at),
         genres = case when r.genres_fetched_at is null then p.genres else r.genres end,
-        genres_fetched_at = coalesce(r.genres_fetched_at, p.genres_fetched_at),
-        details_fetched_at = coalesce(r.details_fetched_at, case when p.image_url is not null then now() end)
+        genres_fetched_at = coalesce(r.genres_fetched_at, p.genres_fetched_at)
       from artists p
       where r.id = ${real} and p.id = ${imported}`);
     await database.execute(sql`delete from artists where id = ${imported}`);

@@ -43,6 +43,8 @@ export const users = pgTable("users", {
   lastSyncedAt: timestamptz("last_synced_at"),
   lastPlayedAt: timestamptz("last_played_at"),
   syncError: text("sync_error"),
+  // When the worker last stored the user's Spotify top lists
+  topListsFetchedAt: timestamptz("top_lists_fetched_at"),
 });
 
 // Kept apart from `users` so that selecting a user never pulls tokens along.

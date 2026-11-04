@@ -7,6 +7,7 @@ import { linkImportedTracks } from "@/lib/import/link";
 import { refreshNowPlaying, staleNowPlayingUsers } from "@/lib/now-playing";
 import { fetchMissingPictures } from "@/lib/pictures";
 import { SpotifyError } from "@/lib/spotify/api";
+import { refreshTopLists } from "@/lib/spotify/top";
 import { syncUser } from "@/lib/sync";
 
 const TICK_MS = 15_000;
@@ -16,6 +17,8 @@ const NOW_PLAYING_MAX_AGE_MS = 30_000;
 // spread out: this is about 480 a day, under the 650 that got blocked
 const CATALOG_ROUND_MS = 15 * 60_000;
 const CATALOG_LOOKUPS_PER_ROUND = 5;
+// Top lists change slowly, and six requests per user bring in up to 300 items
+const TOP_LISTS_EVERY_MS = 6 * 60 * 60_000;
 // Last.fm allows about 5 requests per second
 const GENRES_PER_TICK = 40;
 // Deezer allows about 10 requests per second, and an artist can take three
@@ -51,6 +54,21 @@ function dueUsers() {
     .orderBy(sql`${users.lastSyncedAt} asc nulls first`);
 }
 
+// Users with working tokens whose top lists are old or were never stored.
+function usersDueForTopLists() {
+  const cutoff = new Date(Date.now() - TOP_LISTS_EVERY_MS);
+  return db
+    .select({ id: users.id })
+    .from(users)
+    .innerJoin(spotifyTokens, eq(spotifyTokens.userId, users.id))
+    .where(
+      and(
+        isNull(spotifyTokens.revokedAt),
+        or(isNull(users.topListsFetchedAt), lt(users.topListsFetchedAt, cutoff)),
+      ),
+    );
+}
+
 async function tick() {
   const now = new Date();
   await db
@@ -71,6 +89,10 @@ async function tick() {
     if (stopping) return;
     const added = await syncUser(user.id);
     if (added) console.log(`${user.displayName}: ${added} new plays`);
+  }
+  for (const user of await usersDueForTopLists()) {
+    if (stopping) return;
+    await refreshTopLists(user.id);
   }
   if (Date.now() >= nextCatalogRound) {
     nextCatalogRound = Date.now() + CATALOG_ROUND_MS;

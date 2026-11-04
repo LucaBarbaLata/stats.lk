@@ -31,6 +31,7 @@ async function main() {
       DATABASE_URL: test.href,
       SPOTIFY_CLIENT_ID: "test",
       SPOTIFY_CLIENT_SECRET: "test",
+      TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
       LASTFM_API_KEY: "test",
       APP_TIMEZONE: "Europe/Bucharest",
     },

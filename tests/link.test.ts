@@ -92,7 +92,7 @@ describe("imported names", () => {
     const [real] = await db.select().from(artists).where(eq(artists.id, REAL_ARTIST.id));
     assert.equal(real.imageUrl, "https://example.com/artist.jpg");
     assert.deepEqual(real.genres, ["rock"]);
-    assert.ok(real.detailsFetchedAt, "a found picture spares the Spotify lookup");
+    assert.equal(real.detailsFetchedAt, null, "Spotify's own photo is still looked up");
 
     const hidden = await db.select().from(hiddenItems).where(eq(hiddenItems.userId, user.id));
     assert.deepEqual(hidden.map((item) => item.itemId), [REAL_ARTIST.id], "a hidden artist stays hidden");

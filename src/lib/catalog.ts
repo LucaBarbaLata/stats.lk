@@ -120,27 +120,32 @@ export async function upsertTracks(input: SpotifyTrack[]): Promise<void> {
   });
 }
 
-// Store full artist objects (e.g. from the user's Spotify top list).
+// Store full artist objects (e.g. from the user's Spotify top list). They take
+// over from made-up artists of the same name, plays included.
 export async function upsertArtists(input: SpotifyArtist[]): Promise<void> {
   if (!input.length) return;
-  await db
-    .insert(artists)
-    .values(
-      input.map((artist) => ({
-        id: artist.id,
-        name: artist.name,
-        imageUrl: pickImage(artist.images),
-        detailsFetchedAt: new Date(),
-      })),
-    )
-    .onConflictDoUpdate({
-      target: artists.id,
-      set: {
-        name: sql`excluded.name`,
-        imageUrl: sql`excluded.image_url`,
-        detailsFetchedAt: sql`excluded.details_fetched_at`,
-      },
-    });
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(artists)
+      .values(
+        input.map((artist) => ({
+          id: artist.id,
+          name: artist.name,
+          imageUrl: pickImage(artist.images),
+          detailsFetchedAt: new Date(),
+        })),
+      )
+      .onConflictDoUpdate({
+        target: artists.id,
+        set: {
+          name: sql`excluded.name`,
+          // Spotify's photo wins, but an artist it has none for keeps Deezer's
+          imageUrl: sql`coalesce(excluded.image_url, artists.image_url)`,
+          detailsFetchedAt: sql`excluded.details_fetched_at`,
+        },
+      });
+    await absorbImportedArtists(tx, input.map((artist) => artist.id));
+  });
 }
 
 // Imported plays only carry a track ID and names. Look the tracks up on
@@ -204,12 +209,17 @@ export async function fetchMissingGenres(limit: number): Promise<number> {
 }
 
 // Track objects only carry simplified artists (no image), and Spotify
-// removed the batch endpoint, so artists are fetched one by one.
+// removed the batch endpoint, so artists are fetched one by one, most played
+// first. Spotify's photo replaces any picture found on Deezer in the meantime.
 export async function fetchMissingArtistDetails(limit: number): Promise<number> {
   const pending = await db
     .select({ id: artists.id })
     .from(artists)
+    .leftJoin(trackArtists, eq(trackArtists.artistId, artists.id))
+    .leftJoin(streams, eq(streams.trackId, trackArtists.trackId))
     .where(and(isNull(artists.detailsFetchedAt), eq(artists.imported, false)))
+    .groupBy(artists.id)
+    .orderBy(desc(count(streams.trackId)))
     .limit(limit);
   if (!pending.length) return 0;
 

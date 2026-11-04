@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import { upsertArtists, upsertTracks } from "../catalog";
+import { db } from "../db";
+import { users } from "../db/schema";
 import type { SpotifyTerm } from "../ranges";
 import { pickImage, spotifyGet } from "./api";
 import { getAccessToken } from "./tokens";
@@ -43,4 +46,22 @@ export async function getSpotifyTop(
     imageUrl: pickImage(artist.images, 64),
     subtitle: "",
   }));
+}
+
+const TERMS: SpotifyTerm[] = ["short_term", "medium_term", "long_term"];
+
+// Top lists are the only full artists a user's token can read, so this is how
+// the artists people play most get Spotify's own photo and ID right away. They
+// kept working while Spotify blocked catalog lookups for a day. Only an extra:
+// if they fail, syncing carries on and they're tried again next time.
+export async function refreshTopLists(userId: string): Promise<void> {
+  try {
+    for (const term of TERMS) {
+      await getSpotifyTop(userId, "artists", term);
+      await getSpotifyTop(userId, "tracks", term);
+    }
+  } catch (error) {
+    console.error(`Top lists failed for user ${userId}:`, error instanceof Error ? error.message : error);
+  }
+  await db.update(users).set({ topListsFetchedAt: new Date() }).where(eq(users.id, userId));
 }

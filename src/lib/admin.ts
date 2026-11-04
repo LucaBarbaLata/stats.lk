@@ -55,7 +55,8 @@ export async function getSystemStats() {
       (select count(*) from tracks)::int as tracks,
       (select count(*) from tracks where details_fetched_at is null)::int as "tracksPending",
       (select count(*) from artists)::int as artists,
-      (select count(*) from artists where details_fetched_at is null)::int as "artistsPending",
+      -- Artists from imports can't be looked up until a track gives them a Spotify ID
+      (select count(*) from artists where details_fetched_at is null and not imported)::int as "artistsPending",
       -- Only artists with plays get genres (see fetchMissingGenres)
       (select count(*) from artists a where genres_fetched_at is null
         and exists (select 1 from track_artists ta join streams s on s.track_id = ta.track_id

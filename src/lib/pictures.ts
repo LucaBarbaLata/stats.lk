@@ -80,7 +80,7 @@ export async function findAlbumCover(artist: string, album: string): Promise<str
 }
 
 // Looks up pictures for the most played artists and albums that have none.
-// An artist Deezer knows needs no Spotify lookup for its picture.
+// They're shown until Spotify's own arrive, see fetchMissingArtistDetails.
 export async function fetchMissingPictures(limit: number): Promise<number> {
   const perKind = Math.ceil(limit / 2);
 
@@ -103,11 +103,7 @@ export async function fetchMissingPictures(limit: number): Promise<number> {
 
   for (const artist of pendingArtists) {
     const imageUrl = await findArtistPicture(artist.name, artist.tracks);
-    const now = new Date();
-    await db
-      .update(artists)
-      .set({ imageUrl, pictureLookedUpAt: now, ...(imageUrl && { detailsFetchedAt: now }) })
-      .where(eq(artists.id, artist.id));
+    await db.update(artists).set({ imageUrl, pictureLookedUpAt: new Date() }).where(eq(artists.id, artist.id));
   }
 
   const pendingAlbums = await db
