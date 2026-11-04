@@ -1,0 +1,46 @@
+# Production stack: docker compose up -d --build
+x-app: &app
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://statslk:${POSTGRES_PASSWORD}@db:5432/statslk
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: statslk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: statslk
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U statslk -d statslk"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    <<: *app
+    build: { context: ., target: worker }
+    command: ["./node_modules/.bin/tsx", "scripts/migrate.ts"]
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    <<: *app
+    build: { context: ., target: worker }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    <<: *app
+    build: { context: ., target: web }
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:

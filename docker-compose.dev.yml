@@ -1,0 +1,16 @@
+# Local development: only Postgres runs in Docker, the app runs with `npm run dev`.
+# docker compose -f docker-compose.dev.yml up -d
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: statslk
+      POSTGRES_PASSWORD: statslk
+      POSTGRES_DB: statslk
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+
+volumes:
+  pgdata-dev:

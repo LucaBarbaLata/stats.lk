@@ -1,0 +1,1 @@
+CREATE INDEX "streams_track_id" ON "streams" USING btree ("track_id");

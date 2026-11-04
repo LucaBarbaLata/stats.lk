@@ -1,0 +1,1 @@
+ALTER TABLE "artists" ADD COLUMN "genres_fetched_at" timestamp with time zone;

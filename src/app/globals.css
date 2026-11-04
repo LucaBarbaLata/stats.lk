@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* Dark by default; a light theme can be added later by overriding these. */
+:root {
+  --background: #0c0c11;
+  /* Raised surfaces, lightest last */
+  --surface: #14141b;
+  --surface-2: #1c1c25;
+  --surface-3: #272732;
+  --border: #22222c;
+  --border-strong: #34343f;
+  --foreground: #f3f3f6;
+  --muted: #a1a1b3;
+  --subtle: #6f6f82;
+  /* Text, bars and rings; readable on the dark background */
+  --accent: #4ade80;
+  /* Filled buttons, with dark text on top */
+  --accent-fill: #22c55e;
+  --accent-foreground: #04210f;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Motion used across the site; delays are set inline per element */
+@theme {
+  /* backwards, not both: a finished page keeps no transform, so fixed and sticky children behave */
+  --animate-page: page 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  --animate-menu: menu 0.16s ease-out both;
+  --animate-ring: ring 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-flash: flash 2.4s ease-out both;
+  --animate-rise: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-grow-x: grow-x 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-grow-y: grow-y 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pop: pop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-glow: glow 6s ease-in-out infinite;
+
+  @keyframes page {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @keyframes menu {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.97);
+    }
+  }
+  /* Fills a progress ring drawn with conic-gradient(... var(--ring) ...) */
+  @keyframes ring {
+    from {
+      --ring: 0deg;
+    }
+  }
+  /* A new row lights up, then settles */
+  @keyframes flash {
+    from {
+      background-color: color-mix(in srgb, var(--accent-fill) 18%, transparent);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+  }
+  @keyframes grow-x {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes grow-y {
+    from {
+      transform: scaleY(0);
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+@property --ring {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+html {
+  /* Pages with and without a scrollbar keep the same width */
+  scrollbar-gutter: stable;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent-fill) 40%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* While a window is open, the page behind it stays put */
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+
+/* Keep the footer clear of the mobile tab bar on app pages */
+@media (width < 48rem) {
+  body:has([data-mobile-nav]) > footer {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}
