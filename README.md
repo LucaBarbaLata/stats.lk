@@ -56,14 +56,49 @@ genres are skipped.
 
 ## Production (Docker)
 
+The stack runs on Docker and leaves the web server to whatever already owns ports
+80 and 443. The app only listens on `127.0.0.1:3000` (change it with `WEB_PORT`).
+
 On the server, next to `docker-compose.yml`:
 
 1. Create `.env` with `APP_URL=https://stats.lucariki.top`, the Spotify credentials,
-   `TOKEN_ENCRYPTION_KEY` and a strong `POSTGRES_PASSWORD`.
+   `TOKEN_ENCRYPTION_KEY` and a `POSTGRES_PASSWORD` made of letters and digits
+   (`openssl rand -hex 24`).
 2. Add `https://stats.lucariki.top/api/auth/callback` as a Redirect URI in the Spotify dashboard.
-3. `docker compose up -d --build`. This starts Postgres, applies migrations,
-   then starts the web app (port 3000) and the worker.
-4. Put a reverse proxy with HTTPS in front of port 3000.
+3. `docker compose up -d --build`. This starts Postgres, applies migrations, then
+   starts the web app, the worker and the daily backup.
+4. Point a website with HTTPS at the app.
+
+### HTTPS with ISPConfig and Apache
+
+1. Enable the Apache modules: `sudo a2enmod proxy proxy_http headers`, then
+   `sudo systemctl reload apache2`.
+2. Under *Sites*, add a website for `stats.lucariki.top` with SSL, Let's Encrypt SSL and
+   *Rewrite HTTP to HTTPS* on, and PHP disabled. The domain must already point at the server.
+3. In its *Options* tab, set *Apache Directives* to:
+   ```apache
+   ProxyPreserveHost On
+   ProxyRequests Off
+   # Let's Encrypt renews through this path, so it must stay on Apache
+   ProxyPass /.well-known/acme-challenge !
+   ProxyPass / http://127.0.0.1:3000/ flushpackets=on
+   ProxyPassReverse / http://127.0.0.1:3000/
+   RequestHeader set X-Forwarded-Proto "https"
+   ```
+
+### Backups and moving the database
+
+The `backup` service writes a dump a day to `./backups` and keeps two weeks of them.
+Copy them off the server too. To restore a dump, or to move a database to a new server:
+
+```bash
+docker compose stop worker web
+docker compose exec -T db pg_restore -U statslk -d statslk --clean --if-exists --no-owner < statslk.dump
+docker compose up -d worker web
+```
+
+Spotify tokens are encrypted, so the server needs the same `TOKEN_ENCRYPTION_KEY` as the
+database it restores. Only one worker may run against a set of tokens: stop the old one first.
 
 ## Scripts
 
@@ -74,6 +109,7 @@ On the server, next to `docker-compose.yml`:
 | `npm run db:generate` | New SQL migration after changing `src/lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
 | `npm run typecheck` / `npm run lint` | Checks |
+| `npm test` | Tests, on their own `statslk_test` database and with no network; needs Postgres running |
 
 ## Layout
 

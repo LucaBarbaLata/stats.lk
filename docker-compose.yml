@@ -38,9 +38,24 @@ services:
     <<: *app
     build: { context: ., target: web }
     ports:
-      - "3000:3000"
+      # Only open to this machine: the server's web server handles HTTPS and
+      # forwards here (see Production in the README)
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
+
+  # A dump a day in ./backups, kept for two weeks
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./scripts/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    command: ["sh", "/backup.sh"]
+    depends_on:
+      db: { condition: service_healthy }
 
 volumes:
   pgdata:

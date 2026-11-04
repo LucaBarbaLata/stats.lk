@@ -101,7 +101,8 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 - [x] **Faza 6d: Dashboard cu panou lateral.** Ales de tine din 4 variante (Spotlight, Bento, Chapters, Side rail). Now playing, top artiști și redările recente stau pe coloana principală, fără cutii. Tot restul e într-un singur panou lateral, împărțit prin linii: ultimele 7 zile, nivelul, On this day, genurile și scurtăturile. Pe telefon, panoul coboară sub coloana principală.
 - [x] **Heatmap cu redările zilei.** Click pe o zi din graficul de pe Activity deschide o fereastră cu tot ce ai ascultat atunci, cu ora și durata. Merge și din tastatură.
 - [x] **Discover după import.** Mesajul „Your history here starts…” apare doar cât timp nu ai importat nimic. Spotify nu spune când a fost creat contul, deci importul e semnalul.
-- [ ] **Faza 7: Deploy** pe `stats.lucariki.top` (reverse proxy cu HTTPS, backup pentru Postgres). Când zici tu că e momentul pentru hosting serios, public.
+- [x] **Teste în proiect.** `npm test` rulează pe baza separată `statslk_test`, cu chei false și fără rețea, deci nu poate atinge datele reale sau serviciile externe.
+- [ ] **Faza 7: Deploy** pe `stats.lucariki.top`, pe serverul `srv1` cu ISPConfig și Apache (nu pe Proxmox, cum era planul inițial). Aplicația și Postgres rulează în Docker, ISPConfig face HTTPS și trimite traficul spre `127.0.0.1:3000`. Backup zilnic în `./backups`. Pașii sunt în README, la Production.
   - **Hotărât pe 3 noiembrie 2026: rămânem la 5 useri** (Development Mode). Extended Quota cere firmă înregistrată și minim 250.000 de useri activi pe lună (din mai 2025), iar Developer Policy III.13 interzice metricile derivate. Variantele pentru mai târziu: hibrid cu Last.fm pentru restul userilor sau open source self-hosted.
 
 ## Stack

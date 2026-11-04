@@ -1,5 +1,7 @@
 node_modules
 .next
+backups
+*.dump
 .env
 .env.*
 !.env.example
