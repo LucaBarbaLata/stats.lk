@@ -22,7 +22,6 @@ export interface CommunityStats {
 
 export async function getCommunityStats(): Promise<CommunityStats> {
   "use cache";
-  cacheLife("hours");
 
   const tz = appTimezone();
   const local = sql`(s.played_at at time zone ${tz})`;
@@ -68,6 +67,11 @@ export async function getCommunityStats(): Promise<CommunityStats> {
       order by sum(s.ms_played) desc
       limit 1`),
   ]);
+
+  // The first visit can come before anyone has plays, and an empty result
+  // must not stick around for an hour
+  if (totals[0].plays > 0) cacheLife("hours");
+  else cacheLife("seconds");
 
   const byHour = new Map(hours.map((row) => [row.hour, row.minutes]));
   return {

@@ -78,6 +78,13 @@
       "when": 1793800094998,
       "tag": "0010_imported_names",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793812056203,
+      "tag": "0011_recheck_artist_pictures",
+      "breakpoints": true
     }
   ]
 }

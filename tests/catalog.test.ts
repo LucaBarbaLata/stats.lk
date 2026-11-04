@@ -80,25 +80,44 @@ describe("pictures from Deezer", () => {
     name,
     picture_big: `https://cdn.example/images/artist/${hash}/500x500.jpg`,
   });
+  const track = (title: string, artistName: string, hash: string) => ({ title, artist: artist(artistName, hash) });
   const album = (title: string, artistName: string) => ({
     title,
     cover_big: `https://cdn.example/${title}.jpg`,
     artist: { name: artistName },
   });
 
-  it("only takes an artist whose name matches", async () => {
-    const stub = stubFetch(() => Response.json({ data: [artist("Jeanne"), artist("Nuanțe")] }));
-    assert.match((await findArtistPicture("nuante")) ?? "", /abc/, "accents and case don't matter");
+  it("picks the artist who made the played track, not a namesake", async () => {
+    const stub = stubFetch(() =>
+      Response.json({ data: [track("Other song", "Band", "wrong"), track("Our Song (feat. Someone) - Remastered 2021", "Band", "right")] }),
+    );
+    assert.match((await findArtistPicture("Band", ["Our Song - Remastered"])) ?? "", /right/);
     stub.mock.restore();
+  });
 
-    const noMatch = stubFetch(() => Response.json({ data: [artist("Jeanne")] }));
-    assert.equal(await findArtistPicture("Nuanțe"), null);
-    noMatch.mock.restore();
+  it("ignores accents and case when comparing", async () => {
+    const stub = stubFetch(() => Response.json({ data: [track("Singurătate", "ALTERNOSFERA", "right")] }));
+    assert.match((await findArtistPicture("Alternosfera", ["Singuratate"])) ?? "", /right/);
+    stub.mock.restore();
+  });
+
+  it("trusts a name alone only when one artist has it", async () => {
+    const unique = stubFetch((url) =>
+      url.includes("/search/artist") ? Response.json({ data: [artist("Jeanne"), artist("Nuanțe")] }) : Response.json({ data: [] }),
+    );
+    assert.match((await findArtistPicture("nuante", ["Unfound"])) ?? "", /abc/);
+    unique.mock.restore();
+
+    const namesakes = stubFetch((url) =>
+      url.includes("/search/artist") ? Response.json({ data: [artist("Band", "one"), artist("Band", "two")] }) : Response.json({ data: [] }),
+    );
+    assert.equal(await findArtistPicture("Band", ["Unfound"]), null, "a wrong photo is worse than none");
+    namesakes.mock.restore();
   });
 
   it("ignores artists without a photo", async () => {
     const stub = stubFetch(() => Response.json({ data: [{ name: "Band", picture_big: "https://cdn.example/images/artist//500x500.jpg" }] }));
-    assert.equal(await findArtistPicture("Band"), null);
+    assert.equal(await findArtistPicture("Band", []), null);
     stub.mock.restore();
   });
 
@@ -112,7 +131,7 @@ describe("pictures from Deezer", () => {
 
   it("reports Deezer's rate limit, which comes in a 200", async () => {
     const stub = stubFetch(() => Response.json({ error: { message: "Quota limit exceeded", code: 4 } }));
-    await assert.rejects(findArtistPicture("Band"), /Quota/);
+    await assert.rejects(findArtistPicture("Band", []), /Quota/);
     stub.mock.restore();
   });
 

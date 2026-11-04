@@ -14,7 +14,7 @@ export async function upsertSpotifyUser(
   tokens: TokenResponse,
 ): Promise<string> {
   const displayName = profile.display_name ?? profile.id;
-  const avatarUrl = pickImage(profile.images, 64);
+  const avatarUrl = pickImage(profile.images);
 
   const [existing] = await db
     .select({ id: users.id, customDisplayName: users.customDisplayName })

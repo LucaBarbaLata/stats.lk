@@ -18,8 +18,8 @@ const CATALOG_ROUND_MS = 15 * 60_000;
 const CATALOG_LOOKUPS_PER_ROUND = 5;
 // Last.fm allows about 5 requests per second
 const GENRES_PER_TICK = 40;
-// Deezer allows about 10 requests per second
-const PICTURES_PER_TICK = 60;
+// Deezer allows about 10 requests per second, and an artist can take three
+const PICTURES_PER_TICK = 40;
 
 let busy = false;
 let stopping = false;
