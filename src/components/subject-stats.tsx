@@ -1,12 +1,30 @@
-import { Headphones } from "lucide-react";
+import { Headphones, LogIn } from "lucide-react";
+import Link from "next/link";
 import { ColumnChart } from "@/components/column-chart";
 import { StatCard } from "@/components/stat-card";
-import { EmptyState } from "@/components/ui";
+import { buttonClass, EmptyState } from "@/components/ui";
 import { formatDate, formatDay, today } from "@/lib/dates";
 import { formatMinutes, formatNumber } from "@/lib/format";
 import { ALL_TIME } from "@/lib/ranges";
 import { monthSeries } from "@/lib/series";
 import { getActivity, getSubjectSummary, type Subject } from "@/lib/stats";
+
+// Stands in for SubjectStats when nobody is logged in
+export function SubjectStatsLogin({ name }: { name: string }) {
+  return (
+    <EmptyState
+      icon={LogIn}
+      title="Log in to see your stats"
+      action={
+        <Link href="/login" className={buttonClass("primary", "sm")}>
+          Log in
+        </Link>
+      }
+    >
+      Your plays and minutes for {name}, when you first listened and your biggest day.
+    </EmptyState>
+  );
+}
 
 // The numbers every artist, track and album page shows: totals, first and
 // favourite day, and minutes per month.

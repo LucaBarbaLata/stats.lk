@@ -49,7 +49,7 @@ const ICONS: Record<TrophyIcon, LucideIcon> = {
 };
 
 // Bronze, silver, gold
-const TIER_COLORS = ["#cd8a4b", "#c3cad6", "#f2c94c"];
+export const TIER_COLORS = ["#cd8a4b", "#c3cad6", "#f2c94c"];
 
 // A pointy-top hexagon with rounded corners, centred in a 48x48 box
 function hexagonPath(radius: number, corner: number): string {
@@ -143,10 +143,34 @@ export function LevelCard({ level, compact }: { level: Level; compact?: boolean 
   );
 }
 
+// What the next tier asks for and how far along it is, or "Done."
+export function TrophyProgress({ trophy, delay = 200 }: { trophy: TrophyResult; delay?: number }) {
+  if (trophy.nextThreshold === null) {
+    return <p className="text-sm text-muted">{trophy.goal.replace("{n}", formatNumber(trophy.tiers.at(-1)!))}. Done.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted">{trophy.goal.replace("{n}", formatNumber(trophy.nextThreshold))}</p>
+      <div className="flex items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
+          <div
+            className="h-full origin-left animate-grow-x rounded-full bg-accent"
+            style={{ width: `${trophy.progress * 100}%`, animationDelay: `${delay}ms` }}
+          />
+        </div>
+        {trophy.unit && (
+          <span className="shrink-0 text-xs text-subtle tabular-nums">
+            {formatNumber(Math.floor(trophy.value))} / {formatNumber(trophy.nextThreshold)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function TrophyCard({ trophy, index = 0 }: { trophy: TrophyResult; index?: number }) {
   const unlocked = trophy.tier > 0;
   const multiTier = trophy.tiers.length > 1;
-  const goal = trophy.goal.replace("{n}", formatNumber(trophy.nextThreshold ?? trophy.tiers.at(-1)!));
 
   return (
     <li
@@ -178,54 +202,7 @@ export function TrophyCard({ trophy, index = 0 }: { trophy: TrophyResult; index?
           </span>
         )}
       </div>
-      {trophy.nextThreshold === null ? (
-        <p className="text-sm text-muted">{trophy.goal.replace("{n}", formatNumber(trophy.tiers.at(-1)!))}. Done.</p>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-sm text-muted">{goal}</p>
-          <div className="flex items-center gap-3">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
-              <div
-                className="h-full origin-left animate-grow-x rounded-full bg-accent"
-                style={{ width: `${trophy.progress * 100}%`, animationDelay: `${200 + Math.min(index, 12) * 40}ms` }}
-              />
-            </div>
-            {trophy.unit && (
-              <span className="shrink-0 text-xs text-subtle tabular-nums">
-                {formatNumber(Math.floor(trophy.value))} / {formatNumber(trophy.nextThreshold)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      <TrophyProgress trophy={trophy} delay={200 + Math.min(index, 12) * 40} />
     </li>
-  );
-}
-
-// Unlocked trophies as a row of coloured icons (for profiles)
-export function TrophyBadges({ trophies, limit = 8 }: { trophies: TrophyResult[]; limit?: number }) {
-  const unlocked = trophies
-    .filter((trophy) => trophy.tier > 0)
-    .sort((a, b) => b.tier - a.tier)
-    .slice(0, limit);
-  if (!unlocked.length) return <p className="text-sm text-subtle">No trophies yet.</p>;
-  return (
-    <ul className="flex flex-wrap gap-2">
-      {unlocked.map((trophy) => {
-        const color = TIER_COLORS[trophy.tier - 1];
-        const tierName = trophy.tiers.length > 1 ? TIER_NAMES[trophy.tier - 1] : "Unlocked";
-        return (
-          <li
-            key={trophy.key}
-            title={`${trophy.name}, ${tierName.toLowerCase()}`}
-            className="flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-sm"
-            style={{ background: `color-mix(in srgb, ${color} 14%, transparent)` }}
-          >
-            <TrophyBadge icon={trophy.icon} tier={trophy.tier} size={28} />
-            {trophy.name}
-          </li>
-        );
-      })}
-    </ul>
   );
 }

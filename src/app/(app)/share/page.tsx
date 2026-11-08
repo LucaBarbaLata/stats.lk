@@ -5,6 +5,7 @@ import { PageHeader, Segmented } from "@/components/ui";
 import { today } from "@/lib/dates";
 import { PRESETS } from "@/lib/ranges";
 import { requireUser } from "@/lib/session";
+import { parseDesign, SHARE_DESIGNS } from "@/lib/share-cards";
 import { getListeningYears } from "@/lib/stats";
 
 const CARDS = [
@@ -20,12 +21,16 @@ export default async function SharePage({ searchParams }: PageProps<"/share">) {
   const user = await requireUser();
   const card = CARDS.find((c) => c.key === query.card)?.key ?? "top-artists";
   const range = PRESETS.find((p) => p.key === query.range)?.key ?? "4w";
+  const design = parseDesign(query.design);
   const years = await getListeningYears(user.id);
   const year = years.find((y) => String(y) === query.year) ?? years[0] ?? Number(today().slice(0, 4));
 
-  const imageUrl = card === "wrapped" ? `/api/share/wrapped?year=${year}` : `/api/share/${card}?range=${range}`;
+  const imageUrl =
+    card === "wrapped"
+      ? `/api/share/wrapped?${new URLSearchParams({ year: String(year), design })}`
+      : `/api/share/${card}?${new URLSearchParams({ range, design })}`;
   const href = (params: Record<string, string>) =>
-    `/share?${new URLSearchParams({ card, range, year: String(year), ...params })}`;
+    `/share?${new URLSearchParams({ card, range, year: String(year), design, ...params })}`;
 
   return (
     <div className="space-y-8">
@@ -52,6 +57,17 @@ export default async function SharePage({ searchParams }: PageProps<"/share">) {
             />
           </div>
           <div className="space-y-2">
+            <p className="text-sm text-muted">Design</p>
+            <Segmented
+              label="Design"
+              items={SHARE_DESIGNS.map((option) => ({
+                href: href({ design: option.key }),
+                label: option.label,
+                active: option.key === design,
+              }))}
+            />
+          </div>
+          <div className="space-y-2">
             <p className="text-sm text-muted">{card === "wrapped" ? "Year" : "Period"}</p>
             <Segmented
               label={card === "wrapped" ? "Year" : "Period"}
@@ -62,7 +78,7 @@ export default async function SharePage({ searchParams }: PageProps<"/share">) {
               }
             />
           </div>
-          <ShareActions url={imageUrl} filename={`stats-lk-${card}.png`} />
+          <ShareActions url={imageUrl} filename={`stats-lk-${card}-${design}.png`} />
         </div>
 
         {/* eslint-disable-next-line @next/next/no-img-element -- generated per request, not optimizable */}

@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-6 px-4 sm:px-6">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" aria-label="stats.lk overview">
+            <Link href="/" aria-label="stats.lk home page">
               <Logo />
             </Link>
             <Suspense fallback={<DesktopNavFallback />}>

@@ -188,7 +188,8 @@ export type LeaderboardEntry = {
 // All-time plays of an artist among the users the viewer can see, except
 // those who hid the artist
 export async function getArtistLeaderboard(
-  viewerId: string,
+  // null for visitors, who only see public profiles
+  viewerId: string | null,
   artistId: string,
   limit: number,
 ): Promise<LeaderboardEntry[]> {

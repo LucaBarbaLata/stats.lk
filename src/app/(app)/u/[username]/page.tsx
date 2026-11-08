@@ -7,7 +7,8 @@ import { Cover } from "@/components/cover";
 import { FriendButton } from "@/components/friend-button";
 import { FriendsNowPlaying, MyNowPlaying } from "@/components/now-playing";
 import { TopList } from "@/components/top-list";
-import { LevelCard, TrophyBadges } from "@/components/trophies";
+import { LevelCard } from "@/components/trophies";
+import { TrophyBadges } from "@/components/trophy-badges";
 import { buttonClass, EmptyState, Section } from "@/components/ui";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -137,7 +138,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
               </Link>
             )}
           </div>
-          <TrophyBadges trophies={trophies} />
+          <TrophyBadges trophies={trophies} seeAllHref={isSelf ? "/insights/trophies" : undefined} />
         </div>
       </section>
 

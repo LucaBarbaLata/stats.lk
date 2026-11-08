@@ -4,11 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { DetailHeader } from "@/components/detail-header";
-import { SubjectStats } from "@/components/subject-stats";
+import { SubjectStats, SubjectStatsLogin } from "@/components/subject-stats";
 import { TopList } from "@/components/top-list";
 import { Section } from "@/components/ui";
 import { ALL_TIME } from "@/lib/ranges";
-import { requireUser } from "@/lib/session";
+import { getCurrentUser } from "@/lib/session";
 import { getAlbum, getTopTracks } from "@/lib/stats";
 
 export async function generateMetadata({ params }: PageProps<"/album/[id]">): Promise<Metadata> {
@@ -16,14 +16,15 @@ export async function generateMetadata({ params }: PageProps<"/album/[id]">): Pr
   return { title: album?.name ?? "Album" };
 }
 
+// Open to visitors too, with a prompt to log in instead of their own stats
 export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
   const { id } = await params;
-  const user = await requireUser();
+  const user = await getCurrentUser();
   const album = await getAlbum(id);
   if (!album) notFound();
 
   const subject = { type: "album" as const, id };
-  const tracks = await getTopTracks(user.id, ALL_TIME, "plays", 50, { subject });
+  const tracks = user ? await getTopTracks(user.id, ALL_TIME, "plays", 50, { subject }) : [];
 
   return (
     <div className="space-y-12">
@@ -50,7 +51,7 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
         </p>
       </DetailHeader>
 
-      <SubjectStats userId={user.id} subject={subject} />
+      {user ? <SubjectStats userId={user.id} subject={subject} /> : <SubjectStatsLogin name={album.name} />}
 
       {tracks.length > 0 && (
         <Section icon={ListMusic} title="Tracks you played">

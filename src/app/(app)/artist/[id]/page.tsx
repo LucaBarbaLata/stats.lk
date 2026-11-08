@@ -5,12 +5,12 @@ import { notFound } from "next/navigation";
 import { Cover } from "@/components/cover";
 import { DetailHeader } from "@/components/detail-header";
 import { HideButton } from "@/components/hide-button";
-import { SubjectStats } from "@/components/subject-stats";
+import { SubjectStats, SubjectStatsLogin } from "@/components/subject-stats";
 import { TopList } from "@/components/top-list";
 import { Section } from "@/components/ui";
 import { formatMinutes, formatNumber } from "@/lib/format";
 import { ALL_TIME } from "@/lib/ranges";
-import { requireUser } from "@/lib/session";
+import { getCurrentUser } from "@/lib/session";
 import { getArtistLeaderboard } from "@/lib/social";
 import { getArtist, getTopAlbums, getTopTracks } from "@/lib/stats";
 
@@ -19,17 +19,19 @@ export async function generateMetadata({ params }: PageProps<"/artist/[id]">): P
   return { title: artist?.name ?? "Artist" };
 }
 
+// Open to visitors too: they get the artist and its public top listeners,
+// and a prompt to log in instead of their own stats
 export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) {
   const { id } = await params;
-  const user = await requireUser();
+  const user = await getCurrentUser();
   const artist = await getArtist(id);
   if (!artist) notFound();
 
   const subject = { type: "artist" as const, id };
   const [tracks, albums, listeners] = await Promise.all([
-    getTopTracks(user.id, ALL_TIME, "plays", 10, { subject }),
-    getTopAlbums(user.id, ALL_TIME, "plays", 5, { subject }),
-    getArtistLeaderboard(user.id, id, 10),
+    user ? getTopTracks(user.id, ALL_TIME, "plays", 10, { subject }) : [],
+    user ? getTopAlbums(user.id, ALL_TIME, "plays", 5, { subject }) : [],
+    getArtistLeaderboard(user?.id ?? null, id, 10),
   ]);
 
   return (
@@ -44,7 +46,7 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
             ? `https://open.spotify.com/search/${encodeURIComponent(artist.name)}`
             : `https://open.spotify.com/artist/${artist.id}`
         }
-        actions={<HideButton userId={user.id} type="artist" itemId={artist.id} />}
+        actions={user && <HideButton userId={user.id} type="artist" itemId={artist.id} />}
       >
         {artist.genres.length > 0 && (
           <ul className="flex flex-wrap gap-2">
@@ -57,7 +59,7 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
         )}
       </DetailHeader>
 
-      <SubjectStats userId={user.id} subject={subject} />
+      {user ? <SubjectStats userId={user.id} subject={subject} /> : <SubjectStatsLogin name={artist.name} />}
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         {tracks.length > 0 && (
@@ -71,11 +73,15 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
             <Section
               icon={Crown}
               title="Top listeners"
-              description="All-time plays among you and the people whose profiles you can see."
+              description={
+                user
+                  ? "All-time plays among you and the people whose profiles you can see."
+                  : "All-time plays among people with a public profile."
+              }
             >
               <ol className="-mx-2">
                 {listeners.map((listener, index) => {
-                  const isYou = listener.userId === user.id;
+                  const isYou = listener.userId === user?.id;
                   return (
                     <li key={listener.userId}>
                       <Link
@@ -97,7 +103,7 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
                   );
                 })}
               </ol>
-              {listeners.length === 1 && (
+              {user && listeners.length === 1 && (
                 <p className="text-sm text-muted">
                   <Link href="/friends" className="text-accent hover:underline">
                     Add friends
