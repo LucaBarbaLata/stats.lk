@@ -6,13 +6,13 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 
 | Temă | Decizie |
 | --- | --- |
-| Public | Doar tu și prietenii, în Spotify Development Mode |
-| Domeniu | `stats.lucariki.top` (temporar) |
+| Public | Doar tu și prietenii, în Spotify Development Mode. Din faza 8: oricine, până la un plafon de conturi, iar datele live rămân doar pentru 5 invitați. |
+| Domeniu | `stats.lucariki.top`. Rămâne și după faza 8 (hotărât pe 8 noiembrie 2026). |
 | Hosting | VM Ubuntu 24.04 pe Proxmox, cu Docker Compose |
 | Platforme | Doar web, fără app de mobil și fără PWA |
 | Surse de date | Doar Spotify: polling + import ZIP „Extended streaming history” |
 | Genuri | Etichete Last.fm, filtrate la genuri reale (Spotify nu le mai dă). Last.fm e folosit doar pentru asta, nu și pentru date de ascultare. |
-| Login | Doar cu Spotify |
+| Login | Doar cu Spotify. Din faza 8: cont propriu cu email și parolă, iar „Log in with Spotify” rămâne pentru invitați. Google poate veni mai târziu. |
 | Design | Dark implicit, inspirat de stats.fm, dar cu identitate proprie (alt nume, alt logo, alt design) |
 | Open-source | Da, mai târziu. Git îl inițializăm când zici tu. |
 | Monetizare | Gratis, eventual donații |
@@ -27,6 +27,8 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 - Câmpuri eliminate: `popularity`, `followers`, plus endpoint-urile batch (`GET /artists?ids=`, `GET /tracks?ids=`). Detaliile artiștilor și ale pieselor importate le luăm unul câte unul, încet, din worker.
 - **Genurile nu mai vin:** la toți artiștii testați, Spotify returnează lista de genuri goală. Le luăm de pe Last.fm (`LASTFM_API_KEY`).
 - Recently played: doar ultimele 50 de piese și fără durata reală ascultată (o estimăm din durata piesei).
+- **Tokenurile expiră la 6 luni** de la autorizare (anunțat pe 18 iunie 2026). Pentru cei conectați, sync-ul se oprește atunci până la o nouă logare.
+- **Exporturile nu dovedesc a cui e contul.** Sunt fișiere JSON pe care omul le poate edita, iar Spotify nu le semnează. Exportul complet nici nu conține numele de utilizator. Account data îl conține, dar se poate scrie acolo și ID-ul altcuiva.
 
 ## Cum se strâng datele
 
@@ -104,6 +106,62 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 - [x] **Teste în proiect.** `npm test` rulează pe baza separată `statslk_test`, cu chei false și fără rețea, deci nu poate atinge datele reale sau serviciile externe.
 - [x] **Faza 7: Deploy** pe `stats.lucariki.top`, pe serverul `srv1` cu ISPConfig și Apache (nu pe Proxmox, cum era planul inițial), cu aplicație Spotify nouă și bază pornită de la zero. Aplicația și Postgres rulează în Docker, ISPConfig face HTTPS și trimite traficul spre `127.0.0.1:3000`. Backup zilnic în `./backups`. Pașii sunt în README, la Production.
   - **Hotărât pe 3 noiembrie 2026: rămânem la 5 useri** (Development Mode). Extended Quota cere firmă înregistrată și minim 250.000 de useri activi pe lună (din mai 2025), iar Developer Policy III.13 interzice metricile derivate. Variantele pentru mai târziu: hibrid cu Last.fm pentru restul userilor sau open source self-hosted.
+- [ ] **Faza 8: Conturi proprii**, pe ramura `own-accounts`. Hotărât pe 8 noiembrie 2026, ca serviciul să poată crește fără limita de 5 de la Spotify. Oricine își face cont și își urcă istoricul, iar datele live rămân pentru cei 5 invitați.
+  - **De ce așa:** nu există date live pentru oricine fără permisiunea Spotify sau fără ceva în plus de la utilizator.
+    - Extended Quota cere firmă.
+    - Last.fm sau Discord înseamnă încă un cont pentru fiecare om.
+    - O extensie sau o aplicație trebuie instalată și nu merge pe iPhone.
+    - Friend Activity prin cookie-ul `sp_dc` încalcă termenii Spotify.
+  - **Login propriu cu email și parolă:**
+    - La înscriere omul alege emailul, parola și username-ul, din care se face linkul `/u/{username}`.
+    - Parola se păstrează doar ca hash (scrypt, inclus în Node).
+    - Contul se confirmă pe email. Conturile neconfirmate în 24 de ore se șterg, ca să nu ocupe locuri din plafon.
+    - Parola se resetează pe email, cu un link care expiră.
+    - Login-ul și înscrierea au limită de încercări.
+    - Sesiunile rămân cele de acum.
+  - **Emailuri:** confirmare, resetare și reamintire. Pleacă prin SMTP de pe un cont de email făcut de tine, pentru că ISPConfig nu gestionează mailurile pe srv1. Setările stau în `.env`. Dacă adresa e pe domeniul tău, trebuie SPF, DKIM și DMARC, altfel emailurile ajung în spam.
+  - **Spotify devine opțional:**
+    - „Log in with Spotify” rămâne pentru tine și invitați.
+    - Conturile existente își pot adăuga email și parolă din Settings, când vor. Un mesaj acolo le amintește, dar nu e obligatoriu.
+    - Un cont nou își conectează Spotify din Settings → Connections, dacă e pe lista din Spotify Dashboard.
+    - Nu unim conturi automat.
+  - **Plafon de conturi:** `MAX_ACCOUNTS` în `.env`, la început 50. La plafon, înscrierile se închid, dar cine are deja cont intră în continuare.
+  - **Poza de profil:** inițialele, până la verificarea Spotify (faza 8b).
+  - **Conturile fără Spotify** au tot ce se calculează din istoric. Now playing și topul Spotify sunt ascunse, iar în locul lor scrie „Stats until <data>”.
+  - **Cont nou:** „No data yet”, pașii pentru export și link spre `/guide`. Fără date demo.
+  - **Reamintire pe email:** opțională din Settings, oprită implicit. Dacă ultimul import are peste 30 de zile, pleacă un email pe lună cu link spre Spotify și spre `/import`, plus link de dezabonare.
+  - **Home:** dispare topul public de artiști, pentru că un export se poate edita. Totalurile rămân, ținute în frâu de limita de 1.000.000 de redări pe cont.
+  - **Texte noi** pe home, în ghid, la Privacy și la Terms, pentru că acum păstrăm emailuri.
+  - **Pe pagina de import** scrie clar că din ZIP pleacă doar redările. Mesajele, căutările, emailul și restul datelor rămân în browser.
+  - **Baza de date:** `users.spotify_id` devine opțional. Apar emailul, hash-ul parolei și data confirmării.
+  - **Gata când** un om care nu e pe lista Spotify își face cont, urcă exportul complet și își vede statisticile, iar contul tău merge în continuare cu Spotify.
+- [ ] **Faza 8b: Verificarea contului Spotify**, opțională. Hotărât pe 8 noiembrie 2026. Fișierele nu pot dovedi a cui e contul (vezi Limitările Spotify), așa că dovada vine de la Spotify.
+  - **Cum merge:**
+    - stats.lk dă un cod.
+    - Omul face un playlist public care are codul în nume și lipește linkul.
+    - Serverul citește playlistul cu tokenul aplicației și verifică proprietarul.
+    - Codul expiră după 30 de minute, iar încercările sunt limitate. După verificare, playlistul se poate șterge.
+  - **Ce primește contul verificat:**
+    - `spotify_id`, deci un cont Spotify ține de un singur cont stats.lk. Dacă omul e invitat mai târziu, login-ul cu Spotify duce în același cont.
+    - Insignă „Spotify verified” și link spre profilul Spotify.
+    - Poza publică de pe Spotify în locul inițialelor.
+    - Avertisment la importul Account data, dacă `username` din fișier e alt cont.
+  - **Ce nu rezolvă:** redările rămân la fel de editabile, deci nu le face mai credibile.
+  - **De testat întâi:**
+    - dacă Spotify mai dă playlisturile altor useri în Development Mode;
+    - cum împarte verificarea limita de căutări cu worker-ul.
+- [ ] **Faza 9: Exportul de un an (Account data)**, după lansare și doar dacă oamenii așteaptă mult exportul complet. La tine, ambele exporturi au venit în cam o zi.
+  - **Conținut:** fișierele `StreamingHistory_music_*.json` au ora de final, artistul, titlul și milisecundele, fără ID-uri și fără album.
+  - **Verificat pe exportul tău:**
+    - `endTime` e în UTC.
+    - Numele sunt identice cu cele din exportul complet.
+    - 95% dintre redări au același minut și aceleași milisecunde.
+  - **Potrivire după artist și titlu:**
+    1. Întâi melodiile salvate și playlisturile din același ZIP, care au ID-uri. La tine acoperă 54% din redări.
+    2. Apoi catalogul.
+    3. Altfel, piese provizorii, ca artiștii și albumele din import.
+  - **Fără dubluri:** când vine exportul complet, redarea provizorie cu același minut, aceleași nume și aceleași milisecunde e înlocuită.
+  - **Din ZIP trimitem doar** redările și ID-urile pieselor.
 
 ## Stack
 
