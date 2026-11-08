@@ -8,3 +8,4 @@ backups
 Dockerfile
 docker-compose*.yml
 *.md
+promo

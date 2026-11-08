@@ -11,7 +11,8 @@
     "test": "tsx --env-file-if-exists=.env scripts/test.ts",
     "worker": "tsx --env-file-if-exists=.env worker/index.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
+    "promo:stats": "tsx --env-file-if-exists=.env scripts/promo-stats.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#c4b5fd"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </radialGradient>
+  </defs>
+  <rect width="120" height="120" fill="url(#bg)"/>
+  <!-- Shoulders -->
+  <ellipse cx="60" cy="132" rx="50" ry="32" fill="#e8822f"/>
+  <!-- Ears -->
+  <path d="M22 58 L28 16 Q30 12 34 15 L58 40 Z" fill="#e8822f"/>
+  <path d="M98 58 L92 16 Q90 12 86 15 L62 40 Z" fill="#e8822f"/>
+  <path d="M30 48 L33 24 L49 39 Z" fill="#ffb3c1"/>
+  <path d="M90 48 L87 24 L71 39 Z" fill="#ffb3c1"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="70" rx="42" ry="36" fill="#f28c38"/>
+  <!-- Tabby stripes -->
+  <path d="M60 36 v12 M50 38 q2 6 1 11 M70 38 q-2 6 -1 11" stroke="#c9631c" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M19 66 h10 M18 75 h9 M101 66 h-10 M102 75 h-9" stroke="#c9631c" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Muzzle -->
+  <ellipse cx="51" cy="88" rx="12" ry="10" fill="#fff4e8"/>
+  <ellipse cx="69" cy="88" rx="12" ry="10" fill="#fff4e8"/>
+  <!-- Eyes -->
+  <ellipse cx="43" cy="68" rx="8.5" ry="10" fill="#a3e635"/>
+  <ellipse cx="77" cy="68" rx="8.5" ry="10" fill="#a3e635"/>
+  <ellipse cx="43" cy="69" rx="3" ry="8" fill="#14140f"/>
+  <ellipse cx="77" cy="69" rx="3" ry="8" fill="#14140f"/>
+  <circle cx="46" cy="64" r="2.4" fill="#fff"/>
+  <circle cx="80" cy="64" r="2.4" fill="#fff"/>
+  <!-- Nose and mouth -->
+  <path d="M54 80 h12 q-2 6 -6 7 q-4 -1 -6 -7 Z" fill="#ff7d96"/>
+  <path d="M60 87 q-3 6 -9 5 M60 87 q3 6 9 5" stroke="#5b3416" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <!-- Whiskers -->
+  <path d="M38 86 L10 81 M38 91 L11 94 M82 86 L110 81 M82 91 L109 94" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+</svg>

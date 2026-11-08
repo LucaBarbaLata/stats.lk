@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#bae6fd"/>
+    </linearGradient>
+    <linearGradient id="snow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" fill="url(#sky)"/>
+  <circle cx="94" cy="24" r="10" fill="#fef9c3"/>
+  <!-- Mountains -->
+  <path d="M-4 78 L28 34 L44 54 L70 22 L124 76 V120 H-4 Z" fill="#94a3b8"/>
+  <path d="M28 34 L36 45 L31 44 L26 50 L21 44 Z M70 22 L82 34 L76 33 L70 40 L63 33 L58 37 Z" fill="#fff"/>
+  <!-- Slope -->
+  <path d="M-4 100 Q50 84 124 58 V124 H-4 Z" fill="url(#snow)"/>
+  <!-- Snow spray -->
+  <g fill="#fff">
+    <circle cx="92" cy="77" r="4"/>
+    <circle cx="99" cy="71" r="3"/>
+    <circle cx="104" cy="78" r="2.5"/>
+    <circle cx="96" cy="64" r="2"/>
+    <circle cx="107" cy="68" r="1.8"/>
+  </g>
+  <!-- Skis -->
+  <path d="M30 101 L88 81" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+  <path d="M36 108 L92 88" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+  <!-- Poles -->
+  <path d="M81 63 L95 90 M49 62 L38 93" stroke="#334155" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- Legs -->
+  <path d="M57 71 L49 84 L54 96" stroke="#1e3a8a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M63 73 L59 87 L64 101" stroke="#1e40af" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Jacket and arms -->
+  <path d="M60 72 L67 50" stroke="#ef4444" stroke-width="15" stroke-linecap="round"/>
+  <path d="M66 53 L81 63" stroke="#dc2626" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 54 L49 62" stroke="#dc2626" stroke-width="6" stroke-linecap="round"/>
+  <!-- Helmet and goggles -->
+  <circle cx="70" cy="39" r="9" fill="#111827"/>
+  <path d="M63 40 h15 v5 h-15 Z" fill="#fb923c"/>
+  <path d="M65 41 h11" stroke="#fde68a" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

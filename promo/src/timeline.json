@@ -1,0 +1,33 @@
+{
+  "fps": 60,
+  "bpm": 120,
+  "beat": 30,
+  "overlap": 14,
+  "cuts": {
+    "hook": 0,
+    "counter": 180,
+    "logo": 360,
+    "top": 540,
+    "activity": 840,
+    "history": 1020,
+    "friends": 1200,
+    "trophies": 1380,
+    "wrapped": 1560,
+    "free": 1740,
+    "end": 1920
+  },
+  "topList": {
+    "switches": [120, 210]
+  },
+  "trophies": {
+    "upgrades": [96, 126]
+  },
+  "endCard": {
+    "headline": 30,
+    "testers": 60,
+    "seats": 75,
+    "seatStagger": 15,
+    "cta": 150
+  },
+  "duration": 2220
+}

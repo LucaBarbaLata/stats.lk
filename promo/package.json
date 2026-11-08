@@ -1,0 +1,27 @@
+{
+  "name": "stats-lk-promo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "soundtrack": "node scripts/soundtrack.mjs",
+    "studio": "node scripts/soundtrack.mjs && remotion studio src/index.ts",
+    "studio:me": "node scripts/soundtrack.mjs && remotion studio src/index.ts --props=public/me/stats.json",
+    "render": "node scripts/soundtrack.mjs && remotion render src/index.ts Trailer out/stats-lk-trailer.mp4",
+    "render:vertical": "node scripts/soundtrack.mjs && remotion render src/index.ts TrailerVertical out/stats-lk-trailer-vertical.mp4",
+    "render:me": "node scripts/soundtrack.mjs && remotion render src/index.ts Trailer out/stats-lk-trailer-me.mp4 --props=public/me/stats.json",
+    "render:me:vertical": "node scripts/soundtrack.mjs && remotion render src/index.ts TrailerVertical out/stats-lk-trailer-me-vertical.mp4 --props=public/me/stats.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.541",
+    "@remotion/google-fonts": "4.0.541",
+    "lucide-react": "1.70.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.541"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

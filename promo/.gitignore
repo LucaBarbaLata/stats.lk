@@ -1,0 +1,6 @@
+node_modules
+out
+# Made by scripts/soundtrack.mjs
+public/soundtrack.wav
+# Your own stats and pictures, from `npm run promo:stats` in the app
+public/me/
