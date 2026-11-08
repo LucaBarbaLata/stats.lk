@@ -9,14 +9,15 @@ import { TopList } from "@/components/top-list";
 import { Section } from "@/components/ui";
 import { ALL_TIME } from "@/lib/ranges";
 import { getCurrentUser } from "@/lib/session";
-import { getAlbum, getTopTracks } from "@/lib/stats";
+import { getAlbum, getAlbumTracks, getTopTracks } from "@/lib/stats";
 
 export async function generateMetadata({ params }: PageProps<"/album/[id]">): Promise<Metadata> {
   const album = await getAlbum((await params).id);
   return { title: album?.name ?? "Album" };
 }
 
-// Open to visitors too, with a prompt to log in instead of their own stats
+// Open to visitors too: instead of their own stats they get the album's songs
+// (without numbers) and a prompt to log in
 export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -24,7 +25,7 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
   if (!album) notFound();
 
   const subject = { type: "album" as const, id };
-  const tracks = user ? await getTopTracks(user.id, ALL_TIME, "plays", 50, { subject }) : [];
+  const tracks = user ? await getTopTracks(user.id, ALL_TIME, "plays", 50, { subject }) : await getAlbumTracks(id, 50);
 
   return (
     <div className="space-y-12">
@@ -54,8 +55,8 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
       {user ? <SubjectStats userId={user.id} subject={subject} /> : <SubjectStatsLogin name={album.name} />}
 
       {tracks.length > 0 && (
-        <Section icon={ListMusic} title="Tracks you played">
-          <TopList items={tracks.map((track) => ({ ...track, href: `/track/${track.id}` }))} />
+        <Section icon={ListMusic} title={user ? "Tracks you played" : "Songs"}>
+          <TopList ranked={Boolean(user)} items={tracks.map((track) => ({ ...track, href: `/track/${track.id}` }))} />
         </Section>
       )}
     </div>

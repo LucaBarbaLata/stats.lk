@@ -12,15 +12,16 @@ import { formatMinutes, formatNumber } from "@/lib/format";
 import { ALL_TIME } from "@/lib/ranges";
 import { getCurrentUser } from "@/lib/session";
 import { getArtistLeaderboard } from "@/lib/social";
-import { getArtist, getTopAlbums, getTopTracks } from "@/lib/stats";
+import { getArtist, getArtistAlbums, getArtistTracks, getTopAlbums, getTopTracks } from "@/lib/stats";
 
 export async function generateMetadata({ params }: PageProps<"/artist/[id]">): Promise<Metadata> {
   const artist = await getArtist((await params).id);
   return { title: artist?.name ?? "Artist" };
 }
 
-// Open to visitors too: they get the artist and its public top listeners,
-// and a prompt to log in instead of their own stats
+// Open to visitors too: instead of their own stats they get the artist's
+// songs and albums (without numbers), its public top listeners and a prompt
+// to log in
 export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -29,8 +30,8 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
 
   const subject = { type: "artist" as const, id };
   const [tracks, albums, listeners] = await Promise.all([
-    user ? getTopTracks(user.id, ALL_TIME, "plays", 10, { subject }) : [],
-    user ? getTopAlbums(user.id, ALL_TIME, "plays", 5, { subject }) : [],
+    user ? getTopTracks(user.id, ALL_TIME, "plays", 10, { subject }) : getArtistTracks(id, 10),
+    user ? getTopAlbums(user.id, ALL_TIME, "plays", 5, { subject }) : getArtistAlbums(id, 12),
     getArtistLeaderboard(user?.id ?? null, id, 10),
   ]);
 
@@ -63,8 +64,8 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         {tracks.length > 0 && (
-          <Section icon={ListMusic} title="Your most played tracks">
-            <TopList items={tracks.map((track) => ({ ...track, href: `/track/${track.id}` }))} />
+          <Section icon={ListMusic} title={user ? "Your most played tracks" : "Songs"}>
+            <TopList ranked={Boolean(user)} items={tracks.map((track) => ({ ...track, href: `/track/${track.id}` }))} />
           </Section>
         )}
 
@@ -115,8 +116,8 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
           )}
 
           {albums.length > 0 && (
-            <Section icon={Disc3} title="Albums you played">
-              <TopList items={albums.map((album) => ({ ...album, href: `/album/${album.id}` }))} />
+            <Section icon={Disc3} title={user ? "Albums you played" : "Albums"}>
+              <TopList ranked={Boolean(user)} items={albums.map((album) => ({ ...album, href: `/album/${album.id}` }))} />
             </Section>
           )}
         </div>

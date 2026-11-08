@@ -2,7 +2,7 @@ import { Headphones, LogIn } from "lucide-react";
 import Link from "next/link";
 import { ColumnChart } from "@/components/column-chart";
 import { StatCard } from "@/components/stat-card";
-import { buttonClass, EmptyState } from "@/components/ui";
+import { buttonClass, EmptyState, Notice } from "@/components/ui";
 import { formatDate, formatDay, today } from "@/lib/dates";
 import { formatMinutes, formatNumber } from "@/lib/format";
 import { ALL_TIME } from "@/lib/ranges";
@@ -12,7 +12,7 @@ import { getActivity, getSubjectSummary, type Subject } from "@/lib/stats";
 // Stands in for SubjectStats when nobody is logged in
 export function SubjectStatsLogin({ name }: { name: string }) {
   return (
-    <EmptyState
+    <Notice
       icon={LogIn}
       title="Log in to see your stats"
       action={
@@ -22,7 +22,7 @@ export function SubjectStatsLogin({ name }: { name: string }) {
       }
     >
       Your plays and minutes for {name}, when you first listened and your biggest day.
-    </EmptyState>
+    </Notice>
   );
 }
 

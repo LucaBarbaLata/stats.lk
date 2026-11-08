@@ -344,6 +344,53 @@ export async function getAlbum(id: string) {
   return { ...album, artists: albumArtistList };
 }
 
+// What stats.lk knows of an artist's or album's music, for the pages anyone
+// can open. Only music someone played is known; plays people hid from others
+// don't count. Lists come without numbers.
+export type CatalogItem = { id: string; name: string; imageUrl: string | null; subtitle: string };
+
+// Plays of the track `t` by anyone, for ordering
+const publicPlaysSql = sql`(select count(*) from streams s where s.track_id = t.id and ${notHiddenSql})`;
+
+// Most played first, with the album as subtitle
+export async function getArtistTracks(artistId: string, limit: number): Promise<CatalogItem[]> {
+  return db.execute<CatalogItem>(sql`
+    select t.id, t.name, al.image_url as "imageUrl", coalesce(al.name, t.imported_album_name, '') as subtitle
+    from (select t.*, ${publicPlaysSql} as plays
+          from tracks t join track_artists ta on ta.track_id = t.id and ta.artist_id = ${artistId}) t
+    left join albums al on al.id = t.album_id
+    where t.plays > 0
+    order by t.plays desc, t.name
+    limit ${limit}`);
+}
+
+// Newest first, with year and type ("2009 · Album") as subtitle
+export async function getArtistAlbums(artistId: string, limit: number): Promise<CatalogItem[]> {
+  return db.execute<CatalogItem>(sql`
+    select al.id, al.name, al.image_url as "imageUrl",
+      concat_ws(' · ', left(al.release_date, 4), initcap(al.album_type)) as subtitle
+    from albums al
+    join album_artists aa on aa.album_id = al.id and aa.artist_id = ${artistId}
+    where exists (select 1 from streams s join tracks t on t.id = s.track_id where t.album_id = al.id and ${notHiddenSql})
+    order by al.release_date desc nulls last, al.name
+    limit ${limit}`);
+}
+
+// Most played first, with the artists as subtitle
+export async function getAlbumTracks(albumId: string, limit: number): Promise<CatalogItem[]> {
+  return db.execute<CatalogItem>(sql`
+    select t.id, t.name, al.image_url as "imageUrl",
+      coalesce(
+        (select string_agg(a.name, ', ' order by ta.position)
+         from track_artists ta join artists a on a.id = ta.artist_id where ta.track_id = t.id),
+        t.imported_artist_name, '') as subtitle
+    from (select t.*, ${publicPlaysSql} as plays from tracks t where t.album_id = ${albumId}) t
+    left join albums al on al.id = t.album_id
+    where t.plays > 0
+    order by t.plays desc, t.name
+    limit ${limit}`);
+}
+
 // -------------------------------------------------------------- insights
 
 export async function getPeriodTotals(userId: string, range: Range) {
