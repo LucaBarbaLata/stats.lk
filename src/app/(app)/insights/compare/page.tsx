@@ -3,13 +3,15 @@ import { CompareList } from "@/components/compare-list";
 import { StatCard } from "@/components/stat-card";
 import { InsightsHeader } from "@/components/sub-nav";
 import { Segmented } from "@/components/ui";
-import { today } from "@/lib/dates";
+import { dayOf, formatDate, today } from "@/lib/dates";
 import { formatMinutes, formatNumber } from "@/lib/format";
 import { comparePeriods, PERIOD_LABELS, type PeriodKind } from "@/lib/periods";
 import { requireUser } from "@/lib/session";
-import { getNewArtists, getPeriodTotals, getTopArtists, getTopTracks } from "@/lib/stats";
+import { getNewArtists, getPeriodTotals, getStatsEnd, getTopArtists, getTopTracks } from "@/lib/stats";
 
 const KINDS = Object.keys(PERIOD_LABELS) as PeriodKind[];
+// For accounts without Spotify, whose periods end at the newest play
+const PERIOD_NAMES: Record<PeriodKind, string> = { week: "Week", month: "Month", year: "Year" };
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -25,7 +27,9 @@ export default async function ComparePage({ searchParams }: PageProps<"/insights
   const query = await searchParams;
   const user = await requireUser();
   const kind = KINDS.find((k) => k === query.period) ?? "month";
-  const { current, previous } = comparePeriods(kind, today(), user.weekStart);
+  // Without Spotify, "this week" is the week of the newest play
+  const { endsAt } = await getStatsEnd(user.id);
+  const { current, previous } = comparePeriods(kind, endsAt ? dayOf(endsAt) : today(), user.weekStart);
 
   const [now, before, artistsNow, artistsBefore, tracksNow, tracksBefore, newNow, newBefore] = await Promise.all([
     getPeriodTotals(user.id, current),
@@ -49,12 +53,13 @@ export default async function ComparePage({ searchParams }: PageProps<"/insights
           label="Period"
           items={KINDS.map((option) => ({
             href: `/insights/compare?period=${option}`,
-            label: PERIOD_LABELS[option],
+            label: endsAt ? PERIOD_NAMES[option] : PERIOD_LABELS[option],
             active: option === kind,
           }))}
         />
         <p className="text-sm text-muted">
           {current.label} compared with the same days before, {previous.label}.
+          {endsAt && ` Counted back from your newest play, ${formatDate(endsAt)}.`}
         </p>
       </div>
 

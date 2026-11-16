@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarHeart, ChevronRight, Gift, History, Mic2, Share2, Tags, Trophy, Upload, type LucideIcon } from "lucide-react";
+import { CalendarDays, CalendarHeart, ChevronRight, Gift, History, Inbox, Mic2, Share2, Tags, Trophy, Upload, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -7,20 +7,18 @@ import { ImportProgressBanner } from "@/components/import-progress";
 import { LiveTime } from "@/components/live-time";
 import { MyNowPlaying } from "@/components/now-playing";
 import { buttonClass, EmptyState, IconChip, LiveBadge, Notice, PageHeader, ProgressBar, Section } from "@/components/ui";
-import { addDays, formatDay, today } from "@/lib/dates";
+import { addDays, dayOf, formatDate, formatDay, today } from "@/lib/dates";
 import { appTimezone } from "@/lib/env";
 import { formatMinutes, formatNumber, formatRelative } from "@/lib/format";
 import { getOnThisDay } from "@/lib/history";
 import { getImportProgress } from "@/lib/import/progress";
 import { levelFor } from "@/lib/levels";
-import { PRESETS } from "@/lib/ranges";
+import { presetRange, rangeLabel } from "@/lib/ranges";
 import { requireUser } from "@/lib/session";
 import { getNowPlaying } from "@/lib/social";
-import { getDailyMinutes, getListeningTotals, getRecentStreams, getTopArtists, getTopGenres } from "@/lib/stats";
+import { getDailyMinutes, getListeningTotals, getRecentStreams, getStatsEnd, getTopArtists, getTopGenres } from "@/lib/stats";
 
 export const metadata: Metadata = { title: "Overview" };
-
-const LAST_4_WEEKS = PRESETS[0];
 
 function greeting(): string {
   const hour = Number(
@@ -34,17 +32,25 @@ function greeting(): string {
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  // Without Spotify, stats stop at the last imported play: no live parts,
+  // and "the last 7 days" or "4 weeks" are the ones before that play
+  const { live, endsAt } = await getStatsEnd(user.id);
+  const last4Weeks = presetRange("4w", endsAt);
   const [totals, topArtists, topGenres, recent, listening, importProgress, onThisDay, daily] = await Promise.all([
     getListeningTotals(user.id),
-    getTopArtists(user.id, LAST_4_WEEKS, "minutes", 5),
-    getTopGenres(user.id, LAST_4_WEEKS, "minutes", 8),
+    getTopArtists(user.id, last4Weeks, "minutes", 5),
+    getTopGenres(user.id, last4Weeks, "minutes", 8),
     getRecentStreams(user.id, 10),
-    getNowPlaying(user.id, [user.id]),
+    live ? getNowPlaying(user.id, [user.id]) : [],
     getImportProgress(user.id),
     getOnThisDay(user.id, 3),
-    getDailyMinutes(user.id, 15),
+    getDailyMinutes(user.id, 15, endsAt),
   ]);
+  const importing = importProgress.plays > 0 && !importProgress.done;
+  if (!live && totals.streams === 0) return <NoDataYet name={user.displayName} importing={importing && importProgress} />;
+
   const todayDay = today();
+  const lastDay = endsAt ? dayOf(endsAt) : todayDay;
   const year = todayDay.slice(0, 4);
   const timeZone = appTimezone();
   const level = levelFor(totals.msTotal / 60_000);
@@ -53,7 +59,7 @@ export default async function DashboardPage() {
   const minutesOn = new Map(daily.map((day) => [day.key, day.msPlayed / 60_000]));
   const days = (from: number) =>
     Array.from({ length: 7 }, (_, index) => {
-      const day = addDays(todayDay, from + index);
+      const day = addDays(lastDay, from + index);
       return { day, minutes: minutesOn.get(day) ?? 0 };
     });
   const sum = (list: { minutes: number }[]) => list.reduce((total, day) => total + day.minutes, 0);
@@ -68,13 +74,23 @@ export default async function DashboardPage() {
       <PageHeader
         title={`${greeting()}, ${user.displayName}`}
         description={
-          totals.msToday > 0
-            ? `${formatMinutes(totals.msToday)} minutes of music so far today.`
-            : "Nothing played yet today."
+          endsAt ? (
+            <>
+              Stats until {formatDate(endsAt)}, your last imported play.{" "}
+              <Link href="/import" className="text-accent hover:underline">
+                Import a newer export
+              </Link>{" "}
+              to catch up.
+            </>
+          ) : totals.msToday > 0 ? (
+            `${formatMinutes(totals.msToday)} minutes of music so far today.`
+          ) : (
+            "Nothing played yet today."
+          )
         }
       />
 
-      {importProgress.plays > 0 && !importProgress.done && <ImportProgressBanner initial={importProgress} />}
+      {importing && <ImportProgressBanner initial={importProgress} />}
 
       {totals.importedStreams === 0 && (
         <Notice
@@ -93,9 +109,9 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12">
         <div className="min-w-0 space-y-11">
-          <MyNowPlaying userId={user.id} initial={listening} />
+          {live && <MyNowPlaying userId={user.id} initial={listening} />}
 
-          <Section icon={Mic2} title="Top artists" description="Last 4 weeks, by minutes" href="/top/artists?range=4w&sort=minutes">
+          <Section icon={Mic2} title="Top artists" description={`${rangeLabel(last4Weeks)}, by minutes`} href="/top/artists?range=4w&sort=minutes">
             {topArtists.length ? (
               <ol className="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-5 sm:gap-5 sm:overflow-visible sm:px-0">
                 {topArtists.map((artist, index) => (
@@ -117,12 +133,12 @@ export default async function DashboardPage() {
               </ol>
             ) : (
               <EmptyState icon={Mic2} title="No artists yet">
-                Play something on Spotify. It shows up here within a minute or two.
+                {live ? "Play something on Spotify. It shows up here within a minute or two." : "Try a longer range under Top."}
               </EmptyState>
             )}
           </Section>
 
-          <Section icon={History} title="Recently played" badge={<LiveBadge />}>
+          <Section icon={History} title="Recently played" badge={live && <LiveBadge />}>
             {recent.length ? (
               <ul className="-mx-2 divide-y divide-border/70">
                 {recent.map((stream, index) => (
@@ -151,7 +167,11 @@ export default async function DashboardPage() {
 
         {/* Everything secondary lives in this one panel, split by lines */}
         <aside className="animate-rise divide-y divide-border/70 rounded-3xl bg-surface px-5" style={{ animationDelay: "120ms" }}>
-          <RailSection icon={CalendarDays} title="Last 7 days" aside={change !== null && <Trend percent={change} />}>
+          <RailSection
+            icon={CalendarDays}
+            title={live ? "Last 7 days" : `7 days to ${formatDay(lastDay, { year: undefined })}`}
+            aside={change !== null && <Trend percent={change} />}
+          >
             <p className="text-[32px] leading-none font-semibold tracking-tight tabular-nums">
               {formatNumber(Math.round(weekMinutes))} <span className="text-lg font-medium text-muted">min</span>
             </p>
@@ -246,9 +266,64 @@ export default async function DashboardPage() {
         </aside>
       </div>
 
-      {user.syncError && (
+      {live && user.syncError && (
         <p className="text-sm text-subtle">Last sync with Spotify failed: {user.syncError}</p>
       )}
+    </div>
+  );
+}
+
+const FIRST_STEPS = [
+  {
+    title: "Ask Spotify for your data",
+    body: "On Spotify's privacy page, tick “Extended streaming history” and request it. Confirm the email Spotify sends.",
+  },
+  {
+    title: "Wait for the ZIP",
+    body: "Spotify emails a download link, usually within a few days and at most 30.",
+  },
+  {
+    title: "Upload it here",
+    body: "Your browser reads the ZIP and sends only your plays. Every stat then goes back to your first one.",
+  },
+];
+
+// A new account without Spotify: nothing to show until the first import
+function NoDataYet({ name, importing }: { name: string; importing: false | Awaited<ReturnType<typeof getImportProgress>> }) {
+  return (
+    <div className="space-y-8">
+      <PageHeader title={`Welcome, ${name}`} description="Your stats come from your Spotify history. Here's how to get it." />
+      {importing && <ImportProgressBanner initial={importing} />}
+      <section className="animate-rise space-y-6 rounded-3xl bg-surface p-5 sm:p-7">
+        <div className="flex items-start gap-4">
+          <IconChip icon={Inbox} size="lg" />
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">No data yet</h2>
+            <p className="text-sm text-pretty text-muted">
+              stats.lk starts with the history you import. It takes three steps, and you only wait on Spotify.
+            </p>
+          </div>
+        </div>
+        <ol className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {FIRST_STEPS.map((step, index) => (
+            <li key={step.title} className="space-y-2 rounded-2xl bg-surface-2 p-4">
+              <span className="flex size-7 items-center justify-center rounded-full bg-accent-fill/15 text-sm font-semibold text-accent tabular-nums">
+                {index + 1}
+              </span>
+              <p className="font-medium">{step.title}</p>
+              <p className="text-sm text-pretty text-muted">{step.body}</p>
+            </li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/guide" className={buttonClass("primary")}>
+            Show me how
+          </Link>
+          <Link href="/import" className={buttonClass("secondary")}>
+            <Upload className="size-4" /> I have the ZIP
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

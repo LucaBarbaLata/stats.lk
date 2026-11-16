@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { SettingsNav, SettingsNavFallback } from "@/components/settings-nav";
+import { getCurrentUser } from "@/lib/session";
 
 // Menu on the left (a row of tabs on phones); each page brings its own
 // title, see SettingsHeader
@@ -9,10 +10,17 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
         <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em] lg:px-3">Settings</h1>
         <Suspense fallback={<SettingsNavFallback />}>
-          <SettingsNav />
+          <Nav />
         </Suspense>
       </div>
       <div className="max-w-3xl space-y-6">{children}</div>
     </div>
   );
+}
+
+// Accounts made with Spotify get a dot on Login until they add an email
+// (optional; the Login page says why)
+async function Nav() {
+  const user = await getCurrentUser();
+  return <SettingsNav attention={user && !user.email ? ["/settings/login"] : []} />;
 }

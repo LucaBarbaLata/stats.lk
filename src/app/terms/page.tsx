@@ -6,13 +6,13 @@ export const metadata: Metadata = { title: "Terms of Use" };
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Use" updated="November 3, 2026">
+    <LegalPage title="Terms of Use" updated="November 9, 2026">
       <section>
         <h2>The service</h2>
         <p>
           stats.lk is a free, personal, non-commercial project that shows statistics about your
-          Spotify listening. It is provided as is, without any warranty. Features can change, and the
-          service can be paused or shut down at any time.
+          Spotify listening, from the history you upload. It is provided as is, without any
+          warranty. Features can change, and the service can be paused or shut down at any time.
         </p>
       </section>
 
@@ -28,9 +28,17 @@ export default function TermsPage() {
       <section>
         <h2>Your account</h2>
         <ul>
-          <li>You log in with your own Spotify account and are responsible for what happens with it.</li>
           <li>
-            While the app is in Spotify&apos;s development mode, only a few invited accounts can use it.
+            You sign up with your own email address, keep your password to yourself, and are
+            responsible for what happens with your account. One account per person.
+          </li>
+          <li>
+            Places are limited. When stats.lk is full, sign-ups close for a while; existing accounts
+            keep working.
+          </li>
+          <li>
+            Live stats from Spotify are only for a few invited accounts, because Spotify limits apps in
+            development mode. Everyone else uses the export Spotify gives them.
           </li>
           <li>
             Your data stays yours. You can download it or delete your account at any time in settings.
@@ -41,8 +49,10 @@ export default function TermsPage() {
       <section>
         <h2>Fair use</h2>
         <p>
-          Don&apos;t try to access other people&apos;s data, overload the service, scrape it or use it
-          for anything illegal. Accounts that do may be removed.
+          Only upload your own listening history, as Spotify gave it to you: not someone else&apos;s,
+          and not one you edited, for example to top a leaderboard. Don&apos;t try to access other
+          people&apos;s data, overload the service, scrape it or use it for anything illegal. Accounts
+          that do may be removed.
         </p>
       </section>
 

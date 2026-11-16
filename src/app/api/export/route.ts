@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       exportedAt: new Date().toISOString(),
       profile: {
         username: user.username,
+        email: user.email,
         spotifyId: user.spotifyId,
         displayName: user.displayName,
         visibility: user.visibility,

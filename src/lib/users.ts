@@ -42,3 +42,41 @@ export async function upsertSpotifyUser(
   await saveTokens(userId, tokens);
   return userId;
 }
+
+export type LinkResult = "linked" | "taken" | "other";
+
+// Ties a Spotify account to an existing account (Settings → Connections).
+// "taken": that Spotify account already has a stats.lk account of its own,
+// and accounts are never merged. "other": this account is tied to another
+// Spotify account. Reconnecting the same one just saves new tokens.
+export async function linkSpotifyAccount(
+  userId: string,
+  profile: SpotifyUser,
+  tokens: TokenResponse,
+): Promise<LinkResult> {
+  const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.spotifyId, profile.id));
+  if (owner && owner.id !== userId) return "taken";
+  const [user] = await db.select({ spotifyId: users.spotifyId }).from(users).where(eq(users.id, userId));
+  if (!user) throw new Error("No such user");
+  if (user.spotifyId && user.spotifyId !== profile.id) return "other";
+
+  try {
+    await db
+      .update(users)
+      .set({
+        spotifyId: profile.id,
+        avatarUrl: pickImage(profile.images),
+        // A first link keeps the name picked here (Spotify's is often a real
+        // name), and later Spotify logins leave it alone too
+        ...(user.spotifyId ? {} : { customDisplayName: true }),
+        syncError: null,
+      })
+      .where(eq(users.id, userId));
+  } catch (error) {
+    // Unique violation: tied to another account a moment ago
+    if ((error as { code?: string }).code === "23505") return "taken";
+    throw error;
+  }
+  await saveTokens(userId, tokens);
+  return "linked";
+}

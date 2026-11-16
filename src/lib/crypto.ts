@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { env } from "./env";
 
 function key(): Buffer {
@@ -17,6 +17,22 @@ export function encrypt(plaintext: string): string {
   return ["v1", iv, cipher.getAuthTag(), ciphertext]
     .map((part) => (typeof part === "string" ? part : part.toString("base64url")))
     .join(".");
+}
+
+// A key of its own for signatures, derived so encryption's isn't reused
+function signingKey(): Buffer {
+  return createHmac("sha256", key()).update("statslk signing key").digest();
+}
+
+// For links that act without a login (unsubscribing from emails)
+export function sign(value: string): string {
+  return createHmac("sha256", signingKey()).update(value).digest("base64url");
+}
+
+export function signatureMatches(value: string, signature: string): boolean {
+  const expected = Buffer.from(sign(value));
+  const given = Buffer.from(signature);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export function decrypt(payload: string): string {

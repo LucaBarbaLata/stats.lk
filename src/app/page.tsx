@@ -21,7 +21,7 @@ const INCLUDED = [
   "Lifetime stats from your imported history",
   "Any time range, down to the day",
   "Listening by hour, weekday and month",
-  "Friends, live listening and taste match",
+  "Friends, taste match and top listeners",
   "Levels and 20 trophies to earn",
   "Wrapped for any year, any day",
   "Export or delete your data any time",
@@ -33,24 +33,28 @@ const FAQ = [
     a: "Yes. There's no paid plan and nothing is locked. stats.lk is a personal project, not a business.",
   },
   {
+    q: "How do I get my stats?",
+    a: "Make an account, then ask Spotify for your extended streaming history. It usually arrives within a few days. Upload the ZIP here and your stats go back to your very first play.",
+  },
+  {
+    q: "Why upload a file instead of connecting Spotify?",
+    a: "Spotify lets small apps connect only 5 accounts, and even then shows them just your last 50 plays. Your full history is in the export Spotify gives you, so that's what stats.lk reads. A few invited accounts also get live stats.",
+  },
+  {
+    q: "How do my stats stay up to date?",
+    a: "Upload a newer export now and then. Plays you already have stay and only new ones are added. If you like, stats.lk emails you once a month when your stats fall behind.",
+  },
+  {
     q: "What do you do with my data?",
-    a: "Show it to you, and to friends if you choose to share. It's never sold, there are no ads, and you can download or delete everything in settings.",
-  },
-  {
-    q: "Why can't everyone sign up yet?",
-    a: "Spotify limits new apps to a handful of invited accounts. Until that changes, ask the person who runs this site to add you.",
-  },
-  {
-    q: "How do I get stats from before I joined?",
-    a: "Spotify only lets us see your last 50 plays. Request your extended streaming history from Spotify once, upload it here, and your stats go back to your first play.",
+    a: "Show it to you, and to friends if you choose to share. Your email is only for logging in and the reminders you ask for. Nothing is sold, there are no ads, and you can download or delete everything in settings.",
   },
   {
     q: "Where do the numbers on this page come from?",
-    a: "From everyone on stats.lk together, updated every hour. They never show one person's listening, and leave out anything people hid.",
+    a: "The totals and charts come from everyone on stats.lk together, updated every hour, and never show one person's listening. The artists in the examples are made up.",
   },
   {
     q: "Is this made by Spotify?",
-    a: "No. stats.lk uses Spotify's public API with your permission and isn't affiliated with Spotify.",
+    a: "No. stats.lk reads the files Spotify gives you and, for invited accounts, Spotify's public API with your permission. It isn't affiliated with Spotify.",
   },
 ];
 
@@ -101,7 +105,7 @@ export default function LandingPage() {
               can open any day of the year. No subscription, nothing locked.
             </p>
             <div className="flex animate-rise flex-wrap items-center gap-3" style={{ animationDelay: "360ms" }}>
-              <Link href="/login" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
+              <Link href="/signup" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
                 Get started
               </Link>
               <a href="#features" className={`${buttonClass("ghost")} h-12 px-5 text-base`}>
@@ -109,7 +113,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="animate-rise text-sm text-subtle" style={{ animationDelay: "480ms" }}>
-              Works with your Spotify account. Not affiliated with Spotify.
+              Works with the history Spotify gives you. Not affiliated with Spotify.
             </p>
           </div>
 
@@ -151,11 +155,7 @@ export default function LandingPage() {
             icon={ChartColumn}
             title="Top lists with the numbers that matter"
             text="Tracks, artists, albums and genres for the last month, the last year, all time or any dates you pick. Every row shows how many times you played it and for how long."
-            preview={
-              <Suspense fallback={<Panel className="h-72" />}>
-                <TopListFeaturePreview />
-              </Suspense>
-            }
+            preview={<TopListFeaturePreview />}
           />
           <Feature
             reverse
@@ -171,7 +171,7 @@ export default function LandingPage() {
           <Feature
             icon={History}
             title="Your whole history, from your first play"
-            text="Spotify only lets us see your last 50 plays. Ask Spotify for your data once, drop the file here, and every stat goes back years. The file is read in your browser; only tracks and times are kept."
+            text="Ask Spotify for your data, drop the ZIP here, and every stat goes back to the day you made your Spotify account. The file is read in your browser; only what you played, when and for how long is sent."
             preview={
               <InView>
                 <Panel>
@@ -192,13 +192,9 @@ export default function LandingPage() {
           <Feature
             reverse
             icon={Users}
-            title="Friends, live"
-            text="See what your friends are playing right now, how well your tastes match and who listens to an artist the most. You decide who sees your profile, and can hide any artist or track."
-            preview={
-              <Suspense fallback={<Panel className="h-56" />}>
-                <FriendsFeaturePreview />
-              </Suspense>
-            }
+            title="Friends, and how your tastes match"
+            text="See how well your tastes match and who listens to an artist the most. Invited accounts with live stats also see what friends play right now. You decide who sees your profile, and can hide any artist or track."
+            preview={<FriendsFeaturePreview />}
           />
           <Feature
             icon={Gift}
@@ -253,9 +249,9 @@ export default function LandingPage() {
         <section className="mb-20 flex flex-col items-start gap-6 rounded-3xl bg-surface p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">See your own numbers</h2>
-            <p className="text-muted">It takes one click with your Spotify account.</p>
+            <p className="text-muted">Make an account, upload your Spotify history and see every year you&apos;ve listened.</p>
           </div>
-          <Link href="/login" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
+          <Link href="/signup" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
             Get started
           </Link>
         </section>
@@ -278,7 +274,7 @@ async function HeaderActions() {
       <Link href="/login" className={buttonClass("ghost", "sm")}>
         Log in
       </Link>
-      <Link href="/login" className={buttonClass("primary", "sm")}>
+      <Link href="/signup" className={buttonClass("primary", "sm")}>
         Get started
       </Link>
     </div>
@@ -296,7 +292,7 @@ function HeroSkeleton() {
 
 async function HeroPreview() {
   const stats = await communityStats();
-  const artists = previewArtists(stats);
+  const artists = previewArtists();
   const minutes = Math.round(stats?.minutesLast7Days ?? 1482);
   const previous = stats?.minutesPrevious7Days ?? 1256;
   const change = previous > 0 ? Math.round(((minutes - previous) / previous) * 100) : null;
@@ -305,7 +301,7 @@ async function HeroPreview() {
     <>
       <Panel className="relative z-10 animate-rise pb-10" style={{ animationDelay: "250ms" }}>
         <div className="mb-4 flex items-baseline justify-between">
-          <p className="font-semibold">Top artists on stats.lk</p>
+          <p className="font-semibold">Your top artists</p>
           <p className="text-sm text-subtle">Last 30 days</p>
         </div>
         <TopPreview rows={artists.slice(0, 4)} start={550} />
@@ -356,12 +352,11 @@ async function TotalsStrip() {
   );
 }
 
-async function TopListFeaturePreview() {
-  const stats = await communityStats();
+function TopListFeaturePreview() {
   return (
     <InView>
       <Panel>
-        <TopPreview rows={previewArtists(stats).slice(0, 5)} onView />
+        <TopPreview rows={previewArtists().slice(0, 5)} onView />
       </Panel>
     </InView>
   );
@@ -381,9 +376,8 @@ async function ActivityFeaturePreview() {
   );
 }
 
-async function FriendsFeaturePreview() {
-  const stats = await communityStats();
-  const [first, second] = previewArtists(stats);
+function FriendsFeaturePreview() {
+  const [first, second] = previewArtists();
   return (
     <InView>
       <Panel className="space-y-4">
@@ -417,8 +411,7 @@ async function WrappedFeaturePreview() {
   const stats = await communityStats();
   const year = stats?.thisYear.year ?? new Date().getFullYear();
   const minutes = Math.round(stats?.thisYear.minutes || 24310);
-  const top = previewArtists(stats)[0];
-  const topArtist = stats?.thisYear.topArtist ? { ...top, ...stats.thisYear.topArtist } : top;
+  const topArtist = previewArtists()[0];
   return (
     <div className="flex justify-center">
       <div className="w-60 animate-float rounded-[28px] bg-gradient-to-b from-[#0f3d22] to-background p-5 shadow-2xl shadow-black/50 ring-1 ring-border">

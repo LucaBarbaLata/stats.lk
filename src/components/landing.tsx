@@ -4,9 +4,9 @@ import type { CommunityStats } from "@/lib/community";
 import { addDays, isoWeekday, today } from "@/lib/dates";
 import { daypartOf, DAYPARTS } from "@/lib/series";
 
-// Product previews for the presentation page, drawn from stats across all of
-// stats.lk (see src/lib/community.ts). When there's nothing yet, sample data
-// with colour tiles for covers stands in.
+// Product previews for the presentation page. Listening times come from all
+// of stats.lk (see src/lib/community.ts), with sample data while there's
+// nothing yet; artists are always made up, with colour tiles for pictures.
 
 export interface PreviewArtist {
   name: string;
@@ -24,15 +24,10 @@ const SAMPLE_ARTISTS: PreviewArtist[] = [
   { name: "Mira and the Tides", minutes: 655, plays: 219, hue: 330, imageUrl: null },
 ];
 
-export function previewArtists(stats: CommunityStats | null): PreviewArtist[] {
-  if (!stats?.topArtists.length) return SAMPLE_ARTISTS;
-  return stats.topArtists.map((artist, index) => ({
-    name: artist.name,
-    imageUrl: artist.imageUrl,
-    plays: artist.plays,
-    minutes: Math.round(artist.minutes),
-    hue: SAMPLE_ARTISTS[index % SAMPLE_ARTISTS.length].hue,
-  }));
+// Always the made-up ones: real names would make a public ranking, and
+// imports can be edited to push one (see src/lib/community.ts)
+export function previewArtists(): PreviewArtist[] {
+  return SAMPLE_ARTISTS;
 }
 
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });

@@ -3,9 +3,12 @@
 import { and, eq } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { addLogin, changeEmail, changePassword } from "@/lib/accounts";
 import { db } from "@/lib/db";
-import { spotifyTokens, streams, users } from "@/lib/db/schema";
+import { nowPlaying, spotifyTokens, streams, users } from "@/lib/db/schema";
 import { refreshNowPlaying } from "@/lib/now-playing";
+import { setImportReminders } from "@/lib/reminders";
+import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { isValidTimezone, SORTS, WEEK_STARTS } from "@/lib/preferences";
 import { PRESETS } from "@/lib/ranges";
 import { currentSessionId, destroySession, endSessions, getCurrentUser } from "@/lib/session";
@@ -98,19 +101,73 @@ export async function savePreferences(_: FormState, formData: FormData): Promise
 
 export async function syncNowFromSettings(): Promise<FormState> {
   const user = await viewer();
+  if (!(await hasSpotifyTokens(user.id))) return { ok: false, message: "Connect Spotify first." };
   const added = await syncUser(user.id);
   await refreshNowPlaying(user.id).catch(() => {});
   refresh();
   return { ok: true, message: added ? `Synced: ${added} new ${added === 1 ? "play" : "plays"}` : "Synced: nothing new" };
 }
 
-// Removes the Spotify tokens and every session. Logging in again reconnects.
+// Removes the Spotify tokens. Accounts that log in only with Spotify are also
+// logged out everywhere, and logging in again reconnects. The Spotify account
+// stays tied to this one, so connecting again lands here too.
 export async function disconnectSpotify() {
   const user = await viewer();
   await db.delete(spotifyTokens).where(eq(spotifyTokens.userId, user.id));
+  await db.delete(nowPlaying).where(eq(nowPlaying.userId, user.id));
+  await db.update(users).set({ syncError: null }).where(eq(users.id, user.id));
+  if (user.email && user.passwordHash) {
+    refresh();
+    return;
+  }
   await endSessions(user.id);
   await destroySession();
   redirect("/login");
+}
+
+const text = (formData: FormData, name: string) => {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+// Settings → Login. The new address only counts once its link is opened.
+export async function addLoginAction(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await viewer();
+  const email = text(formData, "email").trim().toLowerCase();
+  const result = await addLogin(user.id, { email, password: text(formData, "password") });
+  if (!result.ok) return { ok: false, message: result.error };
+  refresh();
+  return { ok: true, message: `Link sent to ${email}` };
+}
+
+export async function changeEmailAction(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await viewer();
+  const email = text(formData, "email").trim().toLowerCase();
+  const result = await changeEmail(user.id, { email, password: text(formData, "password") });
+  if (!result.ok) return { ok: false, message: result.error };
+  refresh();
+  return { ok: true, message: `Link sent to ${email}` };
+}
+
+export async function changePasswordAction(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await viewer();
+  const result = await changePassword(
+    user.id,
+    { current: text(formData, "current"), password: text(formData, "password") },
+    await currentSessionId(),
+  );
+  if (!result.ok) return { ok: false, message: result.error };
+  refresh();
+  return { ok: true, message: "Password changed. Other devices were logged out." };
+}
+
+export async function saveImportReminders(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await viewer();
+  const on = formData.get("importReminders") === "on";
+  if (on && !(user.email && user.emailVerifiedAt)) return { ok: false, message: "Add an email in Settings → Login first." };
+  await setImportReminders(user.id, on);
+  refresh();
+  return { ok: true, message: on ? "Reminders on" : "Reminders off" };
 }
 
 export async function deleteImportedHistory(_: FormState, formData: FormData): Promise<FormState> {

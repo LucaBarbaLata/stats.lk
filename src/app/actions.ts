@@ -15,6 +15,7 @@ import {
   sendFriendRequest,
   type NowPlayingEntry,
 } from "@/lib/social";
+import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { syncUser } from "@/lib/sync";
 
 const MIN_SYNC_GAP_MS = 30_000;
@@ -39,14 +40,14 @@ export async function logout() {
 }
 
 // Called while the app is open (src/components/live-sync.tsx), so fresh
-// plays show up without waiting for the worker. Returns how many plays this
+// plays show up without waiting for the worker. Accounts without Spotify skip it. Returns how many plays this
 // call stored and when the latest saved play was (epoch ms), so the page can
 // also notice plays the worker saved.
 export async function syncNow(): Promise<{ added: number; latestMs: number | null }> {
   const user = await getCurrentUser();
   if (!user) return { added: 0, latestMs: null };
   const due = !user.lastSyncedAt || Date.now() - user.lastSyncedAt.getTime() >= MIN_SYNC_GAP_MS;
-  const added = due ? await syncUser(user.id).catch(() => 0) : 0;
+  const added = due && (await hasSpotifyTokens(user.id)) ? await syncUser(user.id).catch(() => 0) : 0;
   const [row] = await db.execute<{ latestMs: number | null }>(sql`
     select (extract(epoch from max(played_at)) * 1000)::float8 as "latestMs"
     from streams where user_id = ${user.id}::uuid`);

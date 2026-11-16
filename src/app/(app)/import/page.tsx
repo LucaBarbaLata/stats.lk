@@ -1,7 +1,9 @@
+import { ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ImportProgress } from "@/components/import-progress";
+import { IconChip } from "@/components/ui";
 import { getImportProgress } from "@/lib/import/progress";
 import { requireUser } from "@/lib/session";
 import { ImportForm } from "./import-form";
@@ -23,6 +25,18 @@ export default function ImportPage() {
         </p>
       </div>
 
+      <div className="flex items-start gap-4 rounded-2xl bg-surface p-4 sm:p-5">
+        <IconChip icon={ShieldCheck} />
+        <div className="min-w-0 space-y-1">
+          <p className="font-medium">Only your plays leave the ZIP</p>
+          <p className="text-sm text-pretty text-muted">
+            Your browser reads the file. stats.lk gets just the track, when you played it and for how long. Everything
+            else in the export, like searches, playlists, messages, your email, IP addresses and devices, stays on your
+            device.
+          </p>
+        </div>
+      </div>
+
       <ImportForm />
 
       <Suspense fallback={<div className="h-64 animate-pulse rounded-3xl bg-surface" />}>
@@ -30,10 +44,8 @@ export default function ImportPage() {
       </Suspense>
 
       <p className="text-sm text-muted">
-        Your files are read in your browser. Only the track, the time and how long you listened are
-        sent to stats.lk. IP addresses and device info in the export never leave your device. Plays
-        shorter than 30 seconds are skipped, and importing the same file twice won&apos;t create
-        duplicates.
+        Plays shorter than 30 seconds are skipped. Importing the same file twice, or a newer export that overlaps an
+        older one, won&apos;t create duplicates: only new plays are added.
       </p>
     </div>
   );

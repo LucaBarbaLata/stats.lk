@@ -5,7 +5,7 @@ import { Heatmap, type HeatmapDay } from "@/components/heatmap";
 import { RangeFilter } from "@/components/range-filter";
 import { StatCard } from "@/components/stat-card";
 import { IconChip, PageHeader, Section } from "@/components/ui";
-import { addDays, computeStreaks, daysBetween, formatDay, startOfWeek, today } from "@/lib/dates";
+import { addDays, computeStreaks, dayOf, daysBetween, formatDay, startOfWeek, today } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
 import { parseRange } from "@/lib/ranges";
 import {
@@ -20,7 +20,7 @@ import {
   weekdaySeries,
 } from "@/lib/series";
 import { requireUser } from "@/lib/session";
-import { getActivity, getDailyMinutes, getListeningDays } from "@/lib/stats";
+import { getActivity, getDailyMinutes, getListeningDays, getStatsEnd } from "@/lib/stats";
 
 const HEATMAP_WEEKS = 53;
 
@@ -29,15 +29,18 @@ export const metadata: Metadata = { title: "Activity" };
 export default async function ActivityPage({ searchParams }: PageProps<"/activity">) {
   const query = await searchParams;
   const user = await requireUser();
-  const range = parseRange(query, "all");
+  const { endsAt } = await getStatsEnd(user.id);
+  const range = parseRange(query, "all", endsAt);
 
   const todayDay = today();
+  // Without Spotify the heatmap and months end with the newest play
+  const endDay = endsAt ? dayOf(endsAt) : todayDay;
   // Whole weeks from the user's first day of the week, ending with the current week
-  const lastDay = addDays(startOfWeek(todayDay, user.weekStart), 6);
+  const lastDay = addDays(startOfWeek(endDay, user.weekStart), 6);
   const firstDay = addDays(lastDay, -HEATMAP_WEEKS * 7 + 1);
 
   const [daily, listeningDays, hours, weekdays, months] = await Promise.all([
-    getDailyMinutes(user.id, daysBetween(firstDay, todayDay) + 1),
+    getDailyMinutes(user.id, daysBetween(firstDay, endDay) + 1, endsAt),
     getListeningDays(user.id),
     getActivity(user.id, "hour", range),
     getActivity(user.id, "weekday", range),
@@ -50,7 +53,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
     heatmapDays.push({
       date: day,
       label: formatDay(day, { weekday: "short" }),
-      minutes: day > todayDay ? null : (minutesByDay.get(day) ?? 0),
+      minutes: day > endDay ? null : (minutesByDay.get(day) ?? 0),
     });
   }
   // Label a week's column with its month when the month starts in that week
@@ -63,7 +66,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
   }
 
   const streaks = computeStreaks(listeningDays, todayDay);
-  const monthsTo = range.key === "custom" ? range.to.slice(0, 7) : todayDay.slice(0, 7);
+  const monthsTo = range.key === "custom" ? range.to.slice(0, 7) : endDay.slice(0, 7);
   const monthly = monthSeries(months, monthsTo);
   const hourly = hourSeries(hours);
   const daily7 = weekdaySeries(weekdays, user.weekStart);
@@ -117,7 +120,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
         <div className="space-y-4 rounded-2xl bg-surface p-5">
           <h2 className="flex items-center gap-3 font-medium">
             <IconChip icon={CalendarDays} />
-            Minutes per day, last 12 months
+            {endsAt ? `Minutes per day, the 12 months to ${formatDay(endDay)}` : "Minutes per day, last 12 months"}
           </h2>
           <Heatmap days={heatmapDays} monthLabels={monthLabels} />
         </div>

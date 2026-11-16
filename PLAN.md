@@ -127,10 +127,11 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
     - Nu unim conturi automat.
   - **Plafon de conturi:** `MAX_ACCOUNTS` în `.env`, la început 50. La plafon, înscrierile se închid, dar cine are deja cont intră în continuare.
   - **Poza de profil:** inițialele, până la verificarea Spotify (faza 8b).
-  - **Conturile fără Spotify** au tot ce se calculează din istoric. Now playing și topul Spotify sunt ascunse, iar în locul lor scrie „Stats until <data>”.
+  - **Conturile fără Spotify** au tot ce se calculează din istoric. Now playing și topul Spotify sunt ascunse, iar în locul lor scrie „Stats until <data>”. Perioadele (4 săptămâni, 6 luni, un an), heatmap-ul, Compare, profilul și cardurile de share se numără de la cea mai nouă redare, nu de azi.
   - **Cont nou:** „No data yet”, pașii pentru export și link spre `/guide`. Fără date demo.
-  - **Reamintire pe email:** opțională din Settings, oprită implicit. Dacă ultimul import are peste 30 de zile, pleacă un email pe lună cu link spre Spotify și spre `/import`, plus link de dezabonare.
-  - **Home:** dispare topul public de artiști, pentru că un export se poate edita. Totalurile rămân, ținute în frâu de limita de 1.000.000 de redări pe cont.
+  - **Reamintire pe email:** opțională din Settings → Your data, oprită implicit, doar pentru conturile fără Spotify. Dacă cea mai nouă redare are peste 30 de zile, pleacă un email pe lună cu link spre Spotify și spre `/import`, plus link de dezabonare. Se numără de la redare, pentru că importurile nu își păstrează data.
+  - **Home:** dispare topul public de artiști, pentru că un export se poate edita. Exemplele de pe home folosesc artiști inventați. Totalurile rămân, ținute în frâu de limita de 1.000.000 de redări pe cont.
+  - **Conectarea Spotify din Settings** păstrează numele ales la înscriere, pentru că numele de pe Spotify e des numele real. Poza vine de pe Spotify.
   - **Texte noi** pe home, în ghid, la Privacy și la Terms, pentru că acum păstrăm emailuri.
   - **Pe pagina de import** scrie clar că din ZIP pleacă doar redările. Mesajele, căutările, emailul și restul datelor rămân în browser.
   - **Baza de date:** `users.spotify_id` devine opțional. Apar emailul, hash-ul parolei și data confirmării.

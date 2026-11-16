@@ -1,4 +1,5 @@
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { deleteUnconfirmedAccounts } from "@/lib/accounts";
 import { fetchMissingCatalogDetails, fetchMissingGenres } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { spotifyTokens, users, workerHeartbeat } from "@/lib/db/schema";
@@ -7,6 +8,7 @@ import { linkImportedTracks } from "@/lib/import/link";
 import { refreshNowPlaying, staleNowPlayingUsers } from "@/lib/now-playing";
 import { fetchMissingPictures } from "@/lib/pictures";
 import { SpotifyError } from "@/lib/spotify/api";
+import { sendDueReminders } from "@/lib/reminders";
 import { refreshTopLists } from "@/lib/spotify/top";
 import { syncUser } from "@/lib/sync";
 
@@ -23,10 +25,14 @@ const TOP_LISTS_EVERY_MS = 6 * 60 * 60_000;
 const GENRES_PER_TICK = 40;
 // Deezer allows about 10 requests per second, and an artist can take three
 const PICTURES_PER_TICK = 40;
+// Sign-ups nobody confirmed are removed after a day, and import reminders go
+// out once a month; checking hourly is enough for both
+const CLEANUP_EVERY_MS = 60 * 60_000;
 
 let busy = false;
 let stopping = false;
 let nextCatalogRound = 0;
+let nextCleanup = 0;
 
 function stop() {
   stopping = true;
@@ -93,6 +99,13 @@ async function tick() {
   for (const user of await usersDueForTopLists()) {
     if (stopping) return;
     await refreshTopLists(user.id);
+  }
+  if (Date.now() >= nextCleanup) {
+    nextCleanup = Date.now() + CLEANUP_EVERY_MS;
+    const deleted = await deleteUnconfirmedAccounts();
+    if (deleted) console.log(`Deleted ${deleted} sign-ups that were never confirmed`);
+    const reminded = await sendDueReminders();
+    if (reminded) console.log(`Sent ${reminded} import reminders`);
   }
   if (Date.now() >= nextCatalogRound) {
     nextCatalogRound = Date.now() + CATALOG_ROUND_MS;

@@ -33,14 +33,20 @@ export default async function ProfileSettingsPage() {
         <div className="flex flex-col items-center gap-3 sm:pt-7">
           <div className="relative w-32 animate-pop">
             <Cover src={user.avatarUrl} size={128} rounded label={user.displayName} />
-            <span
-              title="Picture from Spotify"
-              className="absolute right-0.5 bottom-0.5 flex size-9 items-center justify-center rounded-full bg-[#1DB954] text-black ring-4 ring-background"
-            >
-              <SpotifyIcon className="size-5" />
-            </span>
+            {user.spotifyId && (
+              <span
+                title="Picture from Spotify"
+                className="absolute right-0.5 bottom-0.5 flex size-9 items-center justify-center rounded-full bg-[#1DB954] text-black ring-4 ring-background"
+              >
+                <SpotifyIcon className="size-5" />
+              </span>
+            )}
           </div>
-          <p className="max-w-36 text-center text-xs text-subtle">Your picture comes from Spotify and updates when you log in.</p>
+          <p className="max-w-36 text-center text-xs text-subtle">
+            {user.spotifyId
+              ? "Your picture comes from Spotify and updates when you log in."
+              : "Your initial for now. Connecting Spotify brings your picture."}
+          </p>
         </div>
 
         <div className="space-y-6">
@@ -49,7 +55,13 @@ export default async function ProfileSettingsPage() {
             name="displayName"
             defaultValue={user.displayName}
             max={DISPLAY_NAME_MAX}
-            hint={user.customDisplayName ? "Logging in no longer changes it." : "Taken from Spotify until you change it."}
+            hint={
+              !user.spotifyId
+                ? "Shown on your profile, to friends and on share cards."
+                : user.customDisplayName
+                  ? "Logging in no longer changes it."
+                  : "Taken from Spotify until you change it."
+            }
           />
           <UsernameField host={host} defaultValue={user.username} />
         </div>
