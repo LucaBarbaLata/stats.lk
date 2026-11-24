@@ -5,10 +5,12 @@ worker that saves your plays, and PostgreSQL.
 
 ## How data gets in
 
-- **Login:** Spotify only exposes your last 50 plays. They are saved right away.
+- **Accounts:** anyone can sign up with an email and a password, up to `MAX_ACCOUNTS`, and
+  import their history. Connecting Spotify is optional and limited to 5 invited people.
+- **Spotify login:** Spotify only exposes your last 50 plays. They are saved right away.
 - **Worker:** fetches every user's recently played tracks every few minutes
   (`SYNC_INTERVAL_MINUTES`), and again whenever the app is opened. It also
-  refreshes what everyone is playing right now every 30 seconds.
+  refreshes what people are playing: every 30 seconds while they listen, every 90 while they don't.
 - **Import:** your full history from Spotify's "Extended streaming history" export
   (`/guide` explains how to get it, `/import` uploads it). The ZIP is parsed in the
   browser; the worker then looks up the imported tracks on Spotify.
@@ -67,10 +69,20 @@ On the server, next to `docker-compose.yml`:
 1. Create `.env` with `APP_URL=https://stats.lucariki.top`, the Spotify credentials,
    `TOKEN_ENCRYPTION_KEY` and a `POSTGRES_PASSWORD` made of letters and digits
    (`openssl rand -hex 24`).
-2. Add `https://stats.lucariki.top/api/auth/callback` as a Redirect URI in the Spotify dashboard.
-3. `docker compose up -d --build`. This starts Postgres, applies migrations, then
+2. For sign-ups, add the `SMTP_*` settings and `EMAIL_FROM` (see `.env.example`). Without them
+   nobody can confirm an email; set `MAX_ACCOUNTS=1` to show sign-ups as closed instead.
+3. Add `https://stats.lucariki.top/api/auth/callback` as a Redirect URI in the Spotify dashboard.
+4. `docker compose up -d --build`. This starts Postgres, applies migrations, then
    starts the web app, the worker and the daily backup.
-4. Point a website with HTTPS at the app.
+5. Point a website with HTTPS at the app.
+
+To check the email settings, send yourself a message from the server:
+
+```bash
+docker compose exec worker ./node_modules/.bin/tsx -e "import { sendEmail } from './src/lib/email'; sendEmail({ to: 'you@example.com', subject: 'stats.lk test', text: 'It works' }).then(() => console.log('sent'), (e) => console.log('failed:', e.message))"
+```
+
+If the sender is on your own domain, set up SPF, DKIM and DMARC for it, or emails land in spam.
 
 ### HTTPS with ISPConfig and Apache
 

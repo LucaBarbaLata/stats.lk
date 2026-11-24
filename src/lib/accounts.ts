@@ -2,6 +2,7 @@ import { and, count, desc, eq, isNotNull, isNull, lt, ne, sql } from "drizzle-or
 import { EMAIL_MAX, passwordProblem } from "./account-rules";
 import { randomToken, sha256 } from "./crypto";
 import { db } from "./db";
+import { isUniqueViolation } from "./db/errors";
 import { emailTokens, sessions, users, type EmailTokenPurpose } from "./db/schema";
 import { sendEmail } from "./email";
 import { appUrl, contactEmail } from "./env";
@@ -190,7 +191,8 @@ async function sendResetLink(userId: string, email: string): Promise<void> {
 
 // Creates an unconfirmed account and emails the confirmation link. When the
 // email already has an account, the answer looks the same and the email goes
-// to its owner instead, so the form doesn't reveal who has an account.
+// to its owner instead, so the form doesn't reveal who has an account. Signing
+// up again before confirming replaces the first try.
 export async function signUp(
   input: { email: string; password: string; username: string },
   ip: string,
@@ -204,9 +206,22 @@ export async function signUp(
   if (!withinLimit(`signup:${ip}`, 5, HOUR)) return { ok: false, error: TOO_MANY };
   if (await isUsernameTaken(username)) return { ok: false, error: "That username is taken. Try another." };
 
+  // Hashed even when it isn't needed, so the time it takes doesn't tell either
+  const passwordHash = await hashPassword(input.password);
   const existing = await findByEmail(email);
   if (existing) {
     if (withinLimit(`email:${email}`, 3, HOUR)) {
+      if (!existing.emailVerifiedAt) {
+        try {
+          await db
+            .update(users)
+            .set({ passwordHash, username, displayName: username })
+            .where(and(eq(users.id, existing.id), isNull(users.emailVerifiedAt)));
+        } catch (error) {
+          if (isUniqueViolation(error)) return { ok: false, error: "That username is taken. Try another." };
+          throw error;
+        }
+      }
       const sent = await trySending(() =>
         existing.emailVerifiedAt ? sendAlreadyRegistered(email) : sendVerifyLink(existing.id, email),
       );
@@ -215,7 +230,6 @@ export async function signUp(
     return { ok: true };
   }
 
-  const passwordHash = await hashPassword(input.password);
   const created = await db.transaction(async (tx): Promise<{ id: string } | "closed" | "taken"> => {
     // One sign-up at a time, so two at once can't both take the last place
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('statslk_signup'))`);
@@ -254,13 +268,28 @@ export async function resendVerification(rawEmail: string, ip: string): Promise<
   return { ok: true };
 }
 
-export type Verified = { userId: string; changed: boolean } | "taken" | null;
+export type Verified = { userId: string; changed: boolean } | "taken" | "password" | "limited" | null;
 
 // Confirms the email of the link and returns the account to log in to.
 // A link to another address than the account's comes from Settings and
 // moves the login there (`changed`); "taken" if another account got that
 // address in the meantime.
-export async function verifyEmail(token: string): Promise<Verified> {
+//
+// Takes the account's password too. Anyone can sign up with someone else's
+// address, and its owner opening the link would otherwise confirm an account
+// whose password the other person knows. The owner can always reset it: that
+// link confirms the address as well.
+export async function verifyEmail(token: string, password: string): Promise<Verified> {
+  if (!(await linkWorks(token, "verify"))) return null;
+  const [owner] = await db
+    .select({ id: users.id, passwordHash: users.passwordHash })
+    .from(emailTokens)
+    .innerJoin(users, eq(users.id, emailTokens.userId))
+    .where(eq(emailTokens.id, sha256(token)));
+  if (!owner) return null;
+  if (!withinLimit(`verify:${owner.id}`, 10, 15 * MINUTE)) return "limited";
+  if (!owner.passwordHash || !(await verifyPassword(password, owner.passwordHash))) return "password";
+
   const link = await consumeLink(token, "verify");
   if (!link) return null;
   const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, link.userId));
@@ -278,7 +307,7 @@ export async function verifyEmail(token: string): Promise<Verified> {
     await db.update(users).set({ email: link.email, emailVerifiedAt: new Date() }).where(eq(users.id, user.id));
   } catch (error) {
     // Unique violation: taken a moment ago
-    if ((error as { code?: string }).code === "23505") return "taken";
+    if (isUniqueViolation(error)) return "taken";
     throw error;
   }
   // Links to the old address (resets) or to other new ones stop working

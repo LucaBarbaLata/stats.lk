@@ -10,11 +10,12 @@ import { linkWorks } from "@/lib/accounts";
 export const metadata: Metadata = { title: "Confirm your email" };
 
 // Opened from the sign-up email, or from the one sent when an email is added
-// or changed in Settings. Confirming takes a click, because email scanners
-// open links on their own and would use the link up otherwise.
+// or changed in Settings. Confirming takes the password (see verifyEmail),
+// and a click, because email scanners open links on their own and would use
+// the link up otherwise.
 export default function VerifyPage({ searchParams }: PageProps<"/verify">) {
   return (
-    <AuthShell title="Confirm your email" description="One click and you're in.">
+    <AuthShell title="Confirm your email" description="Enter your password and you're in.">
       <Suspense fallback={<FormSkeleton />}>
         <VerifyArea searchParams={searchParams} />
       </Suspense>

@@ -224,11 +224,15 @@ export function VerifyForm({ token }: { token: string }) {
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="token" value={token} />
+      <PasswordField autoComplete="current-password" hint="The one you chose for stats.lk." />
       {state?.error && (
         <FormError>
           {state.error}{" "}
-          <Link href="/login" className="font-medium underline underline-offset-2">
-            Log in
+          <Link
+            href={state.wrongPassword ? "/reset-password" : "/login"}
+            className="font-medium underline underline-offset-2"
+          >
+            {state.wrongPassword ? "Reset it" : "Log in"}
           </Link>
         </FormError>
       )}

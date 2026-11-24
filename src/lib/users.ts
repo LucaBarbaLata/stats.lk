@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
+import { isUniqueViolation } from "./db/errors";
 import { users } from "./db/schema";
 import { pickImage } from "./spotify/api";
 import { saveTokens } from "./spotify/tokens";
@@ -74,7 +75,7 @@ export async function linkSpotifyAccount(
       .where(eq(users.id, userId));
   } catch (error) {
     // Unique violation: tied to another account a moment ago
-    if ((error as { code?: string }).code === "23505") return "taken";
+    if (isUniqueViolation(error)) return "taken";
     throw error;
   }
   await saveTokens(userId, tokens);

@@ -120,7 +120,8 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
   - **Login propriu cu email și parolă:**
     - La înscriere omul alege emailul, parola și username-ul, din care se face linkul `/u/{username}`.
     - Parola se păstrează doar ca hash (scrypt, inclus în Node).
-    - Contul se confirmă pe email. Conturile neconfirmate în 24 de ore se șterg, ca să nu ocupe locuri din plafon.
+    - Contul se confirmă pe email, iar linkul cere și parola contului. Altfel, cine se înscrie primul cu emailul altcuiva ar rămâne cu contul după ce proprietarul îl confirmă (găsit și reparat pe 24 noiembrie 2026). O înscriere nouă cu un email neconfirmat o înlocuiește pe cea veche.
+    - Conturile neconfirmate în 24 de ore se șterg, ca să nu ocupe locuri din plafon.
     - Parola se resetează pe email, cu un link care expiră.
     - Login-ul și înscrierea au limită de încercări.
     - Sesiunile rămân cele de acum.
@@ -139,6 +140,7 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
   - **Conectarea Spotify din Settings** păstrează numele ales la înscriere, pentru că numele de pe Spotify e des numele real. Poza vine de pe Spotify.
   - **Texte noi** pe home, în ghid, la Privacy și la Terms, pentru că acum păstrăm emailuri.
   - **Pe pagina de import** scrie clar că din ZIP pleacă doar redările. Mesajele, căutările, emailul și restul datelor rămân în browser.
+  - **Admin:** arată conturile din plafon și câte au Spotify. Conturile fără Spotify și cele neconfirmate nu mai apar ca erori.
   - **Baza de date:** `users.spotify_id` devine opțional. Apar emailul, hash-ul parolei și data confirmării.
   - **Gata când** un om care nu e pe lista Spotify își face cont, urcă exportul complet și își vede statisticile, iar contul tău merge în continuare cu Spotify.
 - [ ] **Faza 8b: Verificarea contului Spotify**, opțională. Hotărât pe 8 noiembrie 2026. Fișierele nu pot dovedi a cui e contul (vezi Limitările Spotify), așa că dovada vine de la Spotify.

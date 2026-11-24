@@ -23,6 +23,8 @@ export type AuthFormState = {
   sentTo?: string;
   // A login refused because the email isn't confirmed yet
   unconfirmed?: boolean;
+  // A confirmation refused because of the password
+  wrongPassword?: boolean;
   // Finished, with nothing else to show (unsubscribing)
   done?: boolean;
 } | null;
@@ -61,8 +63,10 @@ export async function resendVerificationAction(_: AuthFormState, formData: FormD
 }
 
 export async function verifyEmailAction(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
-  const result = await verifyEmail(field(formData, "token"));
+  const result = await verifyEmail(field(formData, "token"), field(formData, "password"));
   if (!result) return { error: "This link has expired or was already used." };
+  if (result === "limited") return { error: "Too many tries. Wait a few minutes and try again." };
+  if (result === "password") return { error: "That's not the password you chose.", wrongPassword: true };
   if (result === "taken") return { error: "Another account uses this email now, so it can't be added to yours." };
   // Already logged in to this account here (a change made from Settings)
   if ((await getCurrentUser())?.id !== result.userId) await startSession(result.userId);

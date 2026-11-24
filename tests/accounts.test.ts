@@ -43,7 +43,7 @@ function lastLinkToken(): string {
 
 async function confirmedAccount() {
   assert.deepEqual(await signUp(newAccount(), IP), { ok: true });
-  assert.ok(await verifyEmail(lastLinkToken()));
+  assert.ok(await verifyEmail(lastLinkToken(), PASSWORD));
 }
 
 const accountByEmail = async (email = "ana@example.com") =>
@@ -69,9 +69,9 @@ describe("signing up", () => {
     assert.equal(outbox.at(-1)?.to, "ana@example.com");
 
     const token = lastLinkToken();
-    assert.deepEqual(await verifyEmail(token), { userId: account.id, changed: false });
+    assert.deepEqual(await verifyEmail(token, PASSWORD), { userId: account.id, changed: false });
     assert.ok((await accountByEmail()).emailVerifiedAt);
-    assert.equal(await verifyEmail(token), null, "a link works once");
+    assert.equal(await verifyEmail(token, PASSWORD), null, "a link works once");
   });
 
   it("refuses to log in until the email is confirmed", async () => {
@@ -81,7 +81,7 @@ describe("signing up", () => {
     assert.equal(!refused.ok && refused.unconfirmed, true);
 
     assert.deepEqual(await resendVerification("ana@example.com", IP), { ok: true });
-    assert.ok(await verifyEmail(lastLinkToken()), "the new link confirms it");
+    assert.ok(await verifyEmail(lastLinkToken(), PASSWORD), "the new link confirms it");
     assert.equal((await logIn(" ANA@example.com ", PASSWORD, IP)).ok, true);
   });
 
@@ -92,6 +92,55 @@ describe("signing up", () => {
     assert.equal((await db.select().from(users)).length, 1, "no second account");
     assert.equal(outbox.length, sentBefore + 1);
     assert.match(outbox.at(-1)?.subject ?? "", /already have/);
+  });
+
+  it("only confirms with the account's password", async () => {
+    await signUp(newAccount(), IP);
+    const token = lastLinkToken();
+    assert.equal(await verifyEmail(token, "some other password"), "password");
+    assert.equal((await accountByEmail()).emailVerifiedAt, null);
+    assert.ok(await verifyEmail(token, PASSWORD), "a wrong try doesn't use the link up");
+  });
+
+  it("slows down guessing the password of a link", async () => {
+    await signUp(newAccount(), IP);
+    const token = lastLinkToken();
+    for (let i = 0; i < 10; i++) await verifyEmail(token, "wrong password");
+    assert.equal(await verifyEmail(token, PASSWORD), "limited");
+  });
+
+  // Someone signs up with an address that isn't theirs, before its owner does
+  it("doesn't leave the account to someone who took the address first", async () => {
+    const OTHER = "someone else's password";
+    await signUp(newAccount({ password: OTHER, username: "other" }), "198.51.100.1");
+    const otherLink = lastLinkToken();
+    await signUp(newAccount(), IP);
+    assert.equal((await db.select().from(users)).length, 1);
+
+    assert.equal(await verifyEmail(otherLink, OTHER), "password", "their password stopped counting");
+    assert.ok(await verifyEmail(lastLinkToken(), PASSWORD));
+    assert.equal((await accountByEmail()).username, "ana");
+    assert.equal((await logIn("ana@example.com", OTHER, IP)).ok, false);
+    assert.equal((await logIn("ana@example.com", PASSWORD, IP)).ok, true);
+  });
+
+  it("doesn't confirm for someone who signs up right after the owner either", async () => {
+    const OTHER = "someone else's password";
+    await signUp(newAccount(), IP);
+    await signUp(newAccount({ password: OTHER, username: "other" }), "198.51.100.1");
+    assert.equal(await verifyEmail(lastLinkToken(), PASSWORD), "password");
+    assert.equal((await logIn("ana@example.com", OTHER, IP)).ok, false, "not confirmed");
+
+    await requestPasswordReset("ana@example.com", IP);
+    assert.equal((await resetPassword(lastLinkToken(), PASSWORD)).ok, true, "the owner gets it by resetting");
+    assert.equal((await logIn("ana@example.com", OTHER, IP)).ok, false);
+  });
+
+  it("leaves a confirmed account alone when someone signs up with its email", async () => {
+    await confirmedAccount();
+    await signUp(newAccount({ password: "someone else's password", username: "other" }), IP);
+    assert.equal((await accountByEmail()).username, "ana");
+    assert.equal((await logIn("ana@example.com", PASSWORD, IP)).ok, true);
   });
 
   it("checks the username, the email and the password", async () => {
@@ -201,7 +250,7 @@ describe("cleaning up", () => {
     await signUp(newAccount(), IP);
     await signUp(newAccount({ email: "fresh@example.com", username: "fresh" }), IP);
     await signUp(newAccount({ email: "done@example.com", username: "done" }), IP);
-    await verifyEmail(lastLinkToken());
+    await verifyEmail(lastLinkToken(), PASSWORD);
     const spotifyUser = await createUser();
 
     const dayAgo = new Date(Date.now() - 25 * 3_600_000);
@@ -221,7 +270,7 @@ describe("adding an email to a Spotify account", () => {
     assert.equal(await pendingEmail(spotifyUser.id), "sam@example.com");
     assert.equal((await logIn("sam@example.com", PASSWORD, IP)).ok, false, "not before confirming");
 
-    assert.deepEqual(await verifyEmail(lastLinkToken()), { userId: spotifyUser.id, changed: true });
+    assert.deepEqual(await verifyEmail(lastLinkToken(), PASSWORD), { userId: spotifyUser.id, changed: true });
     const [account] = await db.select().from(users).where(eq(users.id, spotifyUser.id));
     assert.equal(account.email, "sam@example.com");
     assert.equal(account.spotifyId, spotifyUser.spotifyId);
@@ -244,8 +293,8 @@ describe("adding an email to a Spotify account", () => {
     await addLogin(spotifyUser.id, { email: "first@example.com", password: PASSWORD });
     const first = lastLinkToken();
     await addLogin(spotifyUser.id, { email: "second@example.com", password: PASSWORD });
-    assert.equal(await verifyEmail(first), null);
-    assert.ok(await verifyEmail(lastLinkToken()));
+    assert.equal(await verifyEmail(first, PASSWORD), null);
+    assert.ok(await verifyEmail(lastLinkToken(), PASSWORD));
     assert.equal((await db.select().from(users).where(eq(users.id, spotifyUser.id)))[0].email, "second@example.com");
   });
 
@@ -254,7 +303,19 @@ describe("adding an email to a Spotify account", () => {
     await addLogin(spotifyUser.id, { email: "ana@example.com", password: PASSWORD });
     const token = lastLinkToken();
     await confirmedAccount();
-    assert.equal(await verifyEmail(token), "taken");
+    assert.equal(await verifyEmail(token, PASSWORD), "taken");
+  });
+
+  it("answers taken when two accounts get the address at the same time", async () => {
+    const one = await createUser();
+    const [two] = await db.insert(users).values({ spotifyId: "two", username: "two", displayName: "Two" }).returning();
+    const tokens = [];
+    for (const user of [one, two]) {
+      await addLogin(user.id, { email: "sam@example.com", password: PASSWORD });
+      tokens.push(lastLinkToken());
+    }
+    const results = await Promise.all(tokens.map((token) => verifyEmail(token, PASSWORD)));
+    assert.equal(results.filter((result) => result === "taken").length, 1);
   });
 
   it("keeps the account when it isn't confirmed", async () => {
@@ -278,7 +339,7 @@ describe("changing the email", () => {
     await changeEmail(account.id, { email: "new@example.com", password: PASSWORD });
     const token = lastLinkToken();
     outbox.length = 0;
-    assert.deepEqual(await verifyEmail(token), { userId: account.id, changed: true });
+    assert.deepEqual(await verifyEmail(token, PASSWORD), { userId: account.id, changed: true });
     assert.equal((await logIn("new@example.com", PASSWORD, IP)).ok, true);
     assert.equal((await logIn("ana@example.com", PASSWORD, IP)).ok, false);
     assert.equal(outbox.at(-1)?.to, "ana@example.com", "the old address hears about it");
