@@ -32,6 +32,9 @@ genres are skipped.
 - Max **5 users**, each added by hand under *User Management* in the Spotify dashboard.
 - The app owner needs **Spotify Premium**, or the app stops working.
 - No popularity, follower counts or batch lookups, so artists are fetched one by one.
+- Requests have unpublished quotas per group of endpoints, shared by all apps of the developer
+  account. When Spotify refuses a kind of request, only that kind waits, as long as Spotify
+  asks. `/admin` shows what's paused.
 
 ## Local setup
 

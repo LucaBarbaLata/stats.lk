@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { artists, spotifyTokens, trackArtists, tracks, users, workerHeartbeat } from "@/lib/db/schema";
 import { saveImportedStreams } from "@/lib/import/save";
 import { fetchMissingPictures, findAlbumCover, findArtistPicture } from "@/lib/pictures";
+import { pausedUntil } from "@/lib/spotify/pauses";
 import { refreshTopLists } from "@/lib/spotify/top";
 import { addPlay, addTrack, closeDatabase, createUser, resetDatabase, spotifyId, spotifyTrack, stubFetch } from "./helpers";
 
@@ -48,8 +49,7 @@ describe("Spotify's rate limit", () => {
     await assert.doesNotReject(fetchMissingCatalogDetails(5));
     assert.equal(lookups, 1, "stops at the first refusal");
 
-    const [heartbeat] = await db.select().from(workerHeartbeat);
-    assert.ok(heartbeat.catalogPausedUntil, "the pause survives a restart");
+    assert.ok(await pausedUntil("catalog"), "the pause survives a restart");
 
     await fetchMissingCatalogDetails(5);
     assert.equal(lookups, 1, "Spotify isn't asked while paused");

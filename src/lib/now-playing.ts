@@ -34,12 +34,15 @@ export async function refreshNowPlaying(userId: string): Promise<void> {
     .onConflictDoUpdate({ target: nowPlaying.userId, set: values });
 }
 
-// Users whose now playing is older than `maxAgeMs`, for the worker
-export async function staleNowPlayingUsers(maxAgeMs: number): Promise<string[]> {
+// Users whose now playing is too old, for the worker. People who weren't
+// listening are asked about less often: this is by far the request we make
+// most, and Spotify blocks for hours when there are too many.
+export async function staleNowPlayingUsers(playingMaxAgeMs: number, idleMaxAgeMs: number): Promise<string[]> {
   const rows = await db.execute<{ id: string }>(sql`
     select u.id from users u
     join spotify_tokens st on st.user_id = u.id and st.revoked_at is null
     left join now_playing np on np.user_id = u.id
-    where np.fetched_at is null or np.fetched_at < now() - make_interval(secs => ${maxAgeMs / 1000}::float8)`);
+    where np.fetched_at is null or np.fetched_at < now() - make_interval(
+      secs => case when np.is_playing then ${playingMaxAgeMs / 1000}::float8 else ${idleMaxAgeMs / 1000}::float8 end)`);
   return rows.map((row) => row.id);
 }

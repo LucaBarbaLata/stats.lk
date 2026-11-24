@@ -1,4 +1,5 @@
 import { env, spotifyRedirectUri } from "../env";
+import { callOf, pauseCall, pausedUntil } from "./pauses";
 import type { SpotifyImage, TokenResponse } from "./types";
 
 const ACCOUNTS_URL = "https://accounts.spotify.com";
@@ -14,7 +15,8 @@ export class SpotifyError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    // OAuth error code from the accounts service, e.g. "invalid_grant"
+    // OAuth error code from the accounts service, e.g. "invalid_grant", or the
+    // Web API's reason for a 429, e.g. "QUOTA_EXCEEDED"
     readonly code?: string,
     readonly retryAfterSeconds?: number,
   ) {
@@ -78,20 +80,35 @@ export async function getAppAccessToken(): Promise<string> {
   return appToken.value;
 }
 
-// Returns null for 204 No Content (e.g. nothing currently playing).
+// How long a refusal asks us to wait, in seconds
+function retryAfterSeconds(res: Response): number {
+  const seconds = Number(res.headers.get("retry-after"));
+  return seconds > 0 ? Math.ceil(seconds) : 30;
+}
+
+// Returns null for 204 No Content (e.g. nothing currently playing). A refusal
+// (429) pauses that kind of request, and until the pause ends this throws the
+// same error without asking Spotify.
 export async function spotifyGet<T>(path: string, accessToken: string): Promise<T | null> {
+  const call = callOf(path);
+  const until = call && (await pausedUntil(call));
+  if (until) {
+    const seconds = Math.ceil((until.getTime() - Date.now()) / 1000);
+    throw new SpotifyError("Spotify asked us to wait", 429, undefined, seconds);
+  }
   const res = await fetch(`${API_URL}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (res.status === 204) return null;
   if (res.status === 429) {
     const body = await res.json().catch(() => null);
-    throw new SpotifyError(
-      `Spotify rate limit hit (${body?.reason ?? "RATE_LIMITED"})`,
-      429,
-      body?.reason,
-      Number(res.headers.get("retry-after") ?? 30),
-    );
+    const reason: string | undefined = body?.error?.reason;
+    const seconds = retryAfterSeconds(res);
+    if (call) {
+      console.warn(`Spotify refused ${call} requests (${reason ?? "no reason given"}), pausing them for ${seconds}s`);
+      await pauseCall(call, seconds, reason ?? "no reason given");
+    }
+    throw new SpotifyError("Spotify asked us to wait", 429, reason, seconds);
   }
   if (!res.ok) {
     const body = await res.json().catch(() => null);

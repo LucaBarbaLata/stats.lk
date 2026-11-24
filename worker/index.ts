@@ -8,13 +8,17 @@ import { linkImportedTracks } from "@/lib/import/link";
 import { refreshNowPlaying, staleNowPlayingUsers } from "@/lib/now-playing";
 import { fetchMissingPictures } from "@/lib/pictures";
 import { SpotifyError } from "@/lib/spotify/api";
+import { pausedUntil, type SpotifyCall } from "@/lib/spotify/pauses";
 import { sendDueReminders } from "@/lib/reminders";
 import { refreshTopLists } from "@/lib/spotify/top";
 import { syncUser } from "@/lib/sync";
 
 const TICK_MS = 15_000;
-// How fresh "now playing" is kept for every user
-const NOW_PLAYING_MAX_AGE_MS = 30_000;
+// How fresh "now playing" is kept while someone listens, and while they don't.
+// A paused track disappears 2 minutes after it was last seen (getNowPlaying in
+// src/lib/social.ts), so idle has to stay under that.
+const PLAYING_MAX_AGE_MS = 30_000;
+const IDLE_MAX_AGE_MS = 90_000;
 // Spotify blocks catalog lookups for a day once too many are made, so they're
 // spread out: this is about 480 a day, under the 650 that got blocked
 const CATALOG_ROUND_MS = 15 * 60_000;
@@ -75,6 +79,13 @@ function usersDueForTopLists() {
     );
 }
 
+// Whether Spotify refused this kind of request, so the rest of them wait while
+// everything else carries on. The login server's refusals don't pause anything
+// and go up to main, which waits a bit.
+async function isPaused(error: unknown, call: SpotifyCall): Promise<boolean> {
+  return error instanceof SpotifyError && error.status === 429 && Boolean(await pausedUntil(call));
+}
+
 async function tick() {
   const now = new Date();
   await db
@@ -82,22 +93,31 @@ async function tick() {
     .values({ id: 1, beatAt: now })
     .onConflictDoUpdate({ target: workerHeartbeat.id, set: { beatAt: now } });
 
-  for (const userId of await staleNowPlayingUsers(NOW_PLAYING_MAX_AGE_MS)) {
+  for (const userId of await staleNowPlayingUsers(PLAYING_MAX_AGE_MS, IDLE_MAX_AGE_MS)) {
     if (stopping) return;
+    if (await pausedUntil("now-playing")) break;
     try {
       await refreshNowPlaying(userId);
     } catch (error) {
+      if (await isPaused(error, "now-playing")) break;
       if (error instanceof SpotifyError && error.status === 429) throw error;
       console.error(`Now playing failed for user ${userId}:`, error instanceof Error ? error.message : error);
     }
   }
   for (const user of await dueUsers()) {
     if (stopping) return;
-    const added = await syncUser(user.id);
-    if (added) console.log(`${user.displayName}: ${added} new plays`);
+    if (await pausedUntil("recently-played")) break;
+    try {
+      const added = await syncUser(user.id);
+      if (added) console.log(`${user.displayName}: ${added} new plays`);
+    } catch (error) {
+      if (await isPaused(error, "recently-played")) break;
+      throw error;
+    }
   }
   for (const user of await usersDueForTopLists()) {
     if (stopping) return;
+    if (await pausedUntil("top-lists")) break;
     await refreshTopLists(user.id);
   }
   if (Date.now() >= nextCleanup) {

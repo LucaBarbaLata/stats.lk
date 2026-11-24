@@ -8,6 +8,8 @@ import { db } from "@/lib/db";
 import { nowPlaying, spotifyTokens, streams, users } from "@/lib/db/schema";
 import { refreshNowPlaying } from "@/lib/now-playing";
 import { setImportReminders } from "@/lib/reminders";
+import { formatRelative } from "@/lib/format";
+import { SpotifyError } from "@/lib/spotify/api";
 import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { isValidTimezone, SORTS, WEEK_STARTS } from "@/lib/preferences";
 import { PRESETS } from "@/lib/ranges";
@@ -102,7 +104,15 @@ export async function savePreferences(_: FormState, formData: FormData): Promise
 export async function syncNowFromSettings(): Promise<FormState> {
   const user = await viewer();
   if (!(await hasSpotifyTokens(user.id))) return { ok: false, message: "Connect Spotify first." };
-  const added = await syncUser(user.id);
+  let added: number;
+  try {
+    added = await syncUser(user.id);
+  } catch (error) {
+    if (!(error instanceof SpotifyError && error.status === 429)) throw error;
+    const seconds = error.retryAfterSeconds ?? 30;
+    const when = seconds < 60 ? "in a minute" : formatRelative(new Date(Date.now() + seconds * 1000));
+    return { ok: false, message: `Spotify asked us to wait. Try again ${when}.` };
+  }
   await refreshNowPlaying(user.id).catch(() => {});
   refresh();
   return { ok: true, message: added ? `Synced: ${added} new ${added === 1 ? "play" : "plays"}` : "Synced: nothing new" };

@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { SpotifyCall } from "../spotify/pauses";
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -273,9 +274,15 @@ export const hiddenItems = pgTable(
 export const workerHeartbeat = pgTable("worker_heartbeat", {
   id: integer("id").primaryKey().default(1),
   beatAt: timestamptz("beat_at").notNull(),
-  // Spotify's rate limit stopped catalog lookups until then; kept here so a
-  // restart doesn't ask again too early
-  catalogPausedUntil: timestamptz("catalog_paused_until"),
+});
+
+// Kinds of requests Spotify refused, and until when it asked us to wait
+// (src/lib/spotify/pauses.ts). Rows stay after the wait is over.
+export const spotifyPauses = pgTable("spotify_pauses", {
+  call: text("call").$type<SpotifyCall>().primaryKey(),
+  until: timestamptz("until").notNull(),
+  // What Spotify answered, for the admin panel, e.g. "QUOTA_EXCEEDED"
+  reason: text("reason").notNull(),
 });
 
 export type User = typeof users.$inferSelect;

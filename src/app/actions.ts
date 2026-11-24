@@ -19,8 +19,11 @@ import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { syncUser } from "@/lib/sync";
 
 const MIN_SYNC_GAP_MS = 30_000;
-// The viewer's own now playing is fetched from Spotify when older than this
-const OWN_NOW_PLAYING_MAX_AGE_MS = 10_000;
+// The viewer's own now playing is fetched from Spotify when older than this.
+// The page polls every 15 seconds: every poll asks while something plays,
+// every other one while nothing does.
+const OWN_PLAYING_MAX_AGE_MS = 10_000;
+const OWN_IDLE_MAX_AGE_MS = 25_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function requireViewer() {
@@ -63,10 +66,11 @@ export async function pollNowPlaying(userIds: unknown): Promise<NowPlayingEntry[
 
   if (ids.includes(viewer.id)) {
     const [own] = await db
-      .select({ fetchedAt: nowPlaying.fetchedAt })
+      .select({ fetchedAt: nowPlaying.fetchedAt, isPlaying: nowPlaying.isPlaying })
       .from(nowPlaying)
       .where(eq(nowPlaying.userId, viewer.id));
-    if (!own || Date.now() - own.fetchedAt.getTime() > OWN_NOW_PLAYING_MAX_AGE_MS) {
+    const maxAge = own?.isPlaying ? OWN_PLAYING_MAX_AGE_MS : OWN_IDLE_MAX_AGE_MS;
+    if (!own || Date.now() - own.fetchedAt.getTime() > maxAge) {
       await refreshNowPlaying(viewer.id).catch(() => {});
     }
   }

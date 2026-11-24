@@ -7,18 +7,26 @@ import { getAdminUsers, getSystemStats } from "@/lib/admin";
 import { isAdmin } from "@/lib/env";
 import { formatNumber, formatRelative } from "@/lib/format";
 import { requireUser } from "@/lib/session";
+import { activePauses, type SpotifyCall } from "@/lib/spotify/pauses";
 
 // Spotify Development Mode allows this many users per app
 const DEV_MODE_USER_LIMIT = 5;
 
 const relative = (ms: number | null) => (ms ? formatRelative(new Date(ms)) : "never");
 
+const PAUSED_NAMES: Record<SpotifyCall, string> = {
+  "now-playing": "Now playing",
+  "recently-played": "Saving new plays",
+  "top-lists": "Spotify's top lists",
+  catalog: "Artist and track details",
+};
+
 export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   const user = await requireUser();
   if (!isAdmin(user.spotifyId)) notFound();
-  const [users, stats] = await Promise.all([getAdminUsers(), getSystemStats()]);
+  const [users, stats, pauses] = await Promise.all([getAdminUsers(), getSystemStats(), activePauses()]);
   const { workerOk } = stats;
 
   return (
@@ -60,6 +68,19 @@ export default async function AdminPage() {
           The worker hasn&apos;t checked anything in the last 2 minutes. Plays aren&apos;t being saved:
           start it with <code className="font-mono">npm run worker</code> (or check the worker container).
         </p>
+      )}
+
+      {pauses.length > 0 && (
+        <div role="alert" className="space-y-1 rounded-2xl bg-red-500/10 px-5 py-4 text-sm text-red-200 ring-1 ring-red-500/25 ring-inset">
+          <p>Spotify asked us to wait, so these are paused. Everything else carries on.</p>
+          <ul className="list-inside list-disc">
+            {pauses.map((pause) => (
+              <li key={pause.call}>
+                {PAUSED_NAMES[pause.call]}: trying again {formatRelative(pause.until)} ({pause.reason})
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <section className="space-y-4">

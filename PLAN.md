@@ -28,6 +28,7 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 - **Genurile nu mai vin:** la toți artiștii testați, Spotify returnează lista de genuri goală. Le luăm de pe Last.fm (`LASTFM_API_KEY`).
 - Recently played: doar ultimele 50 de piese și fără durata reală ascultată (o estimăm din durata piesei).
 - **Tokenurile expiră la 6 luni** de la autorizare (anunțat pe 18 iunie 2026). Pentru cei conectați, sync-ul se oprește atunci până la o nouă logare.
+- **Cote de cereri pe grupuri de endpointuri**, comune tuturor aplicațiilor din contul de developer (din iulie 2026). Spotify nu publică nici cifrele, nici grupurile, nici când se resetează. La depășire răspunde 429 cu `QUOTA_EXCEEDED`. Aplicația de dezvoltare și cea de pe srv1 împart aceeași cotă dacă sunt pe același cont.
 - **Exporturile nu dovedesc a cui e contul.** Sunt fișiere JSON pe care omul le poate edita, iar Spotify nu le semnează. Exportul complet nici nu conține numele de utilizator. Account data îl conține, dar se poate scrie acolo și ID-ul altcuiva.
 
 ## Cum se strâng datele
@@ -106,6 +107,10 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 - [x] **Teste în proiect.** `npm test` rulează pe baza separată `statslk_test`, cu chei false și fără rețea, deci nu poate atinge datele reale sau serviciile externe.
 - [x] **Faza 7: Deploy** pe `stats.lucariki.top`, pe serverul `srv1` cu ISPConfig și Apache (nu pe Proxmox, cum era planul inițial), cu aplicație Spotify nouă și bază pornită de la zero. Aplicația și Postgres rulează în Docker, ISPConfig face HTTPS și trimite traficul spre `127.0.0.1:3000`. Backup zilnic în `./backups`. Pașii sunt în README, la Production.
   - **Hotărât pe 3 noiembrie 2026: rămânem la 5 useri** (Development Mode). Extended Quota cere firmă înregistrată și minim 250.000 de useri activi pe lună (din mai 2025), iar Developer Policy III.13 interzice metricile derivate. Variantele pentru mai târziu: hibrid cu Last.fm pentru restul userilor sau open source self-hosted.
+- [x] **Pauze separate pentru limitele Spotify**, pe ramura `own-accounts`. Hotărât pe 24 noiembrie 2026, după ce Spotify a blocat worker-ul de pe srv1 pentru 4 h 20 min, iar în pauza asta nu s-au mai salvat redări.
+  - **Pe feluri de cereri:** now playing, redările recente, topurile și căutările din catalog se opresc fiecare separat (`src/lib/spotify/pauses.ts`). Restul worker-ului merge mai departe.
+  - **În baza de date** (`spotify_pauses`), deci pauza ține peste restarturi și o respectă și site-ul. `/admin` arată ce e oprit, până când și motivul dat de Spotify.
+  - **Mai puține cereri:** worker-ul cere now playing la 30 de secunde cât timp cineva ascultă și la 90 când nu. Pe site, taburile din fundal nu mai cer nimic, iar cele fără muzică cer la 30 de secunde în loc de 15.
 - [ ] **Faza 8: Conturi proprii**, pe ramura `own-accounts`. Hotărât pe 8 noiembrie 2026, ca serviciul să poată crește fără limita de 5 de la Spotify. Oricine își face cont și își urcă istoricul, iar datele live rămân pentru cei 5 invitați.
   - **De ce așa:** nu există date live pentru oricine fără permisiunea Spotify sau fără ceva în plus de la utilizator.
     - Extended Quota cere firmă.
