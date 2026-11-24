@@ -13,7 +13,7 @@ import {
   parseHistory,
   type ImportRow,
 } from "@/lib/import/parse";
-import { importChunk } from "./actions";
+import { finishImport, importChunk } from "./actions";
 
 type Status =
   | { step: "idle" }
@@ -105,12 +105,17 @@ export function ImportForm() {
       const rows = await readFiles(files);
       let added = 0;
       let merged = 0;
-      for (let i = 0; i < rows.length; i += IMPORT_CHUNK_SIZE) {
-        setStatus({ step: "uploading", sent: i, total: rows.length });
-        const result = await importChunk(rows.slice(i, i + IMPORT_CHUNK_SIZE));
-        if ("error" in result) throw new ImportError(result.error);
-        added += result.added;
-        merged += result.merged;
+      try {
+        for (let i = 0; i < rows.length; i += IMPORT_CHUNK_SIZE) {
+          setStatus({ step: "uploading", sent: i, total: rows.length });
+          const result = await importChunk(rows.slice(i, i + IMPORT_CHUNK_SIZE));
+          if ("error" in result) throw new ImportError(result.error);
+          added += result.added;
+          merged += result.merged;
+        }
+      } finally {
+        // Also when it stopped halfway, for what was saved until then
+        if (added || merged) await finishImport().catch(() => {});
       }
       setStatus({ step: "done", added, merged, total: rows.length });
       router.refresh();

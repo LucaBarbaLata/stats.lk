@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ImportProgress } from "@/components/import-progress";
 import { IconChip } from "@/components/ui";
+import { getImportCheck } from "@/lib/import/check";
 import { getImportProgress } from "@/lib/import/progress";
 import { requireUser } from "@/lib/session";
 import { ImportForm } from "./import-form";
@@ -53,8 +54,18 @@ export default function ImportPage() {
 
 async function ImportStatus() {
   const user = await requireUser();
-  const progress = await getImportProgress(user.id);
+  const [progress, check] = await Promise.all([getImportProgress(user.id), getImportCheck(user.id)]);
   if (!progress.plays) return null;
-  // A new import restarts the bar with the new numbers
-  return <ImportProgress key={progress.plays} initial={progress} />;
+  return (
+    <div className="space-y-4">
+      {check?.unusual && (
+        <p role="status" className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-pretty text-amber-100 ring-1 ring-amber-500/25 ring-inset">
+          Some of your imported plays look unusual, for example longer than their track or overlapping. They count in
+          your own stats, but not in the totals on the home page.
+        </p>
+      )}
+      {/* A new import restarts the bar with the new numbers */}
+      <ImportProgress key={progress.plays} initial={progress} />
+    </div>
+  );
 }

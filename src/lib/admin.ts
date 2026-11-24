@@ -17,6 +17,8 @@ export type AdminUser = {
   unconfirmed: boolean;
   streams: number;
   imported: number;
+  // What checking the import found, when it looks edited (src/lib/import/check.ts)
+  unusualImport: string | null;
   lastPlayedMs: number | null;
 };
 
@@ -29,9 +31,12 @@ export function getAdminUsers(): Promise<AdminUser[]> {
       u.sync_error as "syncError", case when st.user_id is null then 'none' when st.revoked_at is null then 'connected' else 'revoked' end as spotify,
       u.spotify_id is null and u.email_verified_at is null as unconfirmed,
       coalesce(s.streams, 0)::int as streams, coalesce(s.imported, 0)::int as imported,
+      case when c.unusual then format('%s of %s plays too long, %s of unknown tracks, %s of %s overlapping, %s days over 24 hours',
+        c.too_long, c.checked, c.unknown, c.overlapping, c.plays, c.impossible_days) end as "unusualImport",
       ${epochMs("s.last_played")} as "lastPlayedMs"
     from users u
     left join spotify_tokens st on st.user_id = u.id
+    left join import_checks c on c.user_id = u.id
     left join (
       select user_id, count(*) as streams, count(*) filter (where source = 'import') as imported,
         max(played_at) as last_played

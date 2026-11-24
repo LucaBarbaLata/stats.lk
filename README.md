@@ -8,9 +8,9 @@ worker that saves your plays, and PostgreSQL.
 - **Accounts:** anyone can sign up with an email and a password, up to `MAX_ACCOUNTS`, and
   import their history. Connecting Spotify is optional and limited to 5 invited people.
 - **Spotify login:** Spotify only exposes your last 50 plays. They are saved right away.
-- **Worker:** fetches every user's recently played tracks every few minutes
-  (`SYNC_INTERVAL_MINUTES`), and again whenever the app is opened. It also
-  refreshes what people are playing: every 30 seconds while they listen, every 90 while they don't.
+- **Worker:** refreshes what people are playing, every 30 seconds while they listen and every
+  90 while they don't. When a track ends it fetches their recently played tracks, at most every
+  few minutes (`SYNC_INTERVAL_MINUTES`) and every half an hour anyway. Opening the app does too.
 - **Import:** your full history from Spotify's "Extended streaming history" export
   (`/guide` explains how to get it, `/import` uploads it). The ZIP is parsed in the
   browser; the worker then looks up the imported tracks on Spotify.

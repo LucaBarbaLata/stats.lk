@@ -34,8 +34,8 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
 ## Cum se strâng datele
 
 1. **La login:** se salvează imediat ultimele 50 de piese.
-2. **Worker:** citește fiecare user la 3 minute (configurabil). Cu 5 useri, asta înseamnă mai puțin de 2 request-uri pe minut.
-3. **La deschiderea dashboard-ului:** sync imediat, ca datele să fie la zi („aproape instant”).
+2. **Worker:** vede prin now playing când se termină o piesă și abia atunci cere redările, cel mult o dată la 3 minute de user (configurabil). Oricum le cere la jumătate de oră. Schimbat pe 24 noiembrie 2026: cererile la 3 minute, toată ziua, au umplut cota Spotify pentru redări.
+3. **La deschiderea dashboard-ului:** sync imediat dacă ultimul e mai vechi de 2 minute, și la schimbarea piesei („aproape instant”). Verificarea de la 45 de secunde citește doar baza noastră.
 4. **Import ZIP:** tot istoricul, cu minutele exacte ascultate. Se unește cu datele de mai sus fără duplicate.
 
 ## Roadmap
@@ -136,13 +136,19 @@ Alternativă independentă la stats.fm, cu toate feature-urile gratis. Doar web,
   - **Conturile fără Spotify** au tot ce se calculează din istoric. Now playing și topul Spotify sunt ascunse, iar în locul lor scrie „Stats until <data>”. Perioadele (4 săptămâni, 6 luni, un an), heatmap-ul, Compare, profilul și cardurile de share se numără de la cea mai nouă redare, nu de azi.
   - **Cont nou:** „No data yet”, pașii pentru export și link spre `/guide`. Fără date demo.
   - **Reamintire pe email:** opțională din Settings → Your data, oprită implicit, doar pentru conturile fără Spotify. Dacă cea mai nouă redare are peste 30 de zile, pleacă un email pe lună cu link spre Spotify și spre `/import`, plus link de dezabonare. Se numără de la redare, pentru că importurile nu își păstrează data.
-  - **Home:** dispare topul public de artiști, pentru că un export se poate edita. Exemplele de pe home folosesc artiști inventați. Totalurile rămân, ținute în frâu de limita de 1.000.000 de redări pe cont.
+  - **Home:** topul public de artiști numără doar redările live de la Spotify, de la conturile cu profilul care nu e privat, fără ce e ascuns (hotărât pe 24 noiembrie 2026). Importurile nu intră, pentru că un export se poate edita. Sub 3 artiști, exemplele sunt inventate. Totalurile rămân, ținute în frâu de limita de 1.000.000 de redări pe cont.
+  - **Înscrieri închise:** butoanele de înscriere dispar de pe home și de la login. Dacă nimeni nu are email, dispare și login-ul cu email și rămâne doar Spotify.
   - **Conectarea Spotify din Settings** păstrează numele ales la înscriere, pentru că numele de pe Spotify e des numele real. Poza vine de pe Spotify.
   - **Texte noi** pe home, în ghid, la Privacy și la Terms, pentru că acum păstrăm emailuri.
   - **Pe pagina de import** scrie clar că din ZIP pleacă doar redările. Mesajele, căutările, emailul și restul datelor rămân în browser.
   - **Admin:** arată conturile din plafon și câte au Spotify. Conturile fără Spotify și cele neconfirmate nu mai apar ca erori.
   - **Baza de date:** `users.spotify_id` devine opțional. Apar emailul, hash-ul parolei și data confirmării.
   - **Gata când** un om care nu e pe lista Spotify își face cont, urcă exportul complet și își vede statisticile, iar contul tău merge în continuare cu Spotify.
+- [x] **Verificarea importurilor** (hotărât pe 24 noiembrie 2026). Spotify nu semnează exportul, deci nu dovedește că e real: prinde doar ce nu poate fi adevărat (`src/lib/import/check.ts`).
+  - **Baza locală întâi:** piesele despre care Spotify ne-a spus deja durata și artiștii se compară pe loc. Cele necunoscute le caută worker-ul, în ritmul de acum, iar verificarea zilnică le include când vine răspunsul.
+  - **Refuzat la import:** un lot de 1.000 de redări în care peste jumătate din piesele cunoscute (minimum 20) au alt artist sau redări mai lungi decât piesa.
+  - **„Unusual import”:** redări prea lungi (peste 5%), piese necunoscute de Spotify (peste 30%), suprapuse (peste 25%) sau 5 zile cu peste 24 de ore. Omul vede un mesaj pe `/import`, tu vezi în `/admin`. Statisticile lui rămân, dar nu intră în totalurile de pe home.
+  - **De calibrat:** pragurile sunt alese larg, fără un export real la îndemână.
 - [ ] **Faza 8b: Verificarea contului Spotify**, opțională. Hotărât pe 8 noiembrie 2026. Fișierele nu pot dovedi a cui e contul (vezi Limitările Spotify), așa că dovada vine de la Spotify.
   - **Cum merge:**
     - stats.lk dă un cod.

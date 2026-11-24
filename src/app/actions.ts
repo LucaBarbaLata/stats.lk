@@ -18,7 +18,10 @@ import {
 import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { syncUser } from "@/lib/sync";
 
-const MIN_SYNC_GAP_MS = 30_000;
+// How long ago the last sync has to be for the app to ask Spotify again, by
+// what happened: the playing track just changed, or the app was opened. The
+// regular polls don't ask at all; the worker fetches plays as tracks end.
+const SYNC_GAP_MS = { track: 30_000, open: 2 * 60_000 } as const;
 // The viewer's own now playing is fetched from Spotify when older than this.
 // The page polls every 15 seconds: every poll asks while something plays,
 // every other one while nothing does.
@@ -46,10 +49,11 @@ export async function logout() {
 // plays show up without waiting for the worker. Accounts without Spotify skip it. Returns how many plays this
 // call stored and when the latest saved play was (epoch ms), so the page can
 // also notice plays the worker saved.
-export async function syncNow(): Promise<{ added: number; latestMs: number | null }> {
+export async function syncNow(reason: unknown): Promise<{ added: number; latestMs: number | null }> {
   const user = await getCurrentUser();
   if (!user) return { added: 0, latestMs: null };
-  const due = !user.lastSyncedAt || Date.now() - user.lastSyncedAt.getTime() >= MIN_SYNC_GAP_MS;
+  const gap = reason === "track" || reason === "open" ? SYNC_GAP_MS[reason] : null;
+  const due = gap !== null && (!user.lastSyncedAt || Date.now() - user.lastSyncedAt.getTime() >= gap);
   const added = due && (await hasSpotifyTokens(user.id)) ? await syncUser(user.id).catch(() => 0) : 0;
   const [row] = await db.execute<{ latestMs: number | null }>(sql`
     select (extract(epoch from max(played_at)) * 1000)::float8 as "latestMs"

@@ -269,6 +269,22 @@ export const hiddenItems = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.type, t.itemId] })],
 );
 
+// What checking someone's imported plays found (src/lib/import/check.ts)
+export const importChecks = pgTable("import_checks", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  plays: integer("plays").notNull(),
+  checked: integer("checked").notNull(),
+  tooLong: integer("too_long").notNull(),
+  unknown: integer("unknown").notNull(),
+  overlapping: integer("overlapping").notNull(),
+  impossibleDays: integer("impossible_days").notNull(),
+  // Left out of the home page's totals; their own stats still count everything
+  unusual: boolean("unusual").notNull(),
+  checkedAt: timestamptz("checked_at").notNull(),
+});
+
 // Updated by the worker on every loop, so the admin panel can tell whether
 // it is running. A single row.
 export const workerHeartbeat = pgTable("worker_heartbeat", {

@@ -6,7 +6,7 @@ import { daypartOf, DAYPARTS } from "@/lib/series";
 
 // Product previews for the presentation page. Listening times come from all
 // of stats.lk (see src/lib/community.ts), with sample data while there's
-// nothing yet; artists are always made up, with colour tiles for pictures.
+// nothing yet, and colour tiles where there's no picture.
 
 export interface PreviewArtist {
   name: string;
@@ -24,9 +24,21 @@ const SAMPLE_ARTISTS: PreviewArtist[] = [
   { name: "Mira and the Tides", minutes: 655, plays: 219, hue: 330, imageUrl: null },
 ];
 
-// Always the made-up ones: real names would make a public ranking, and
-// imports can be edited to push one (see src/lib/community.ts)
-export function previewArtists(): PreviewArtist[] {
+// Fewer than this would make an odd list, so the made-up ones are shown instead
+const MIN_REAL_ARTISTS = 3;
+
+// The top artists of stats.lk, or null while there are too few
+export function realArtists(stats: CommunityStats | null): PreviewArtist[] | null {
+  if (!stats || stats.topArtists.length < MIN_REAL_ARTISTS) return null;
+  return stats.topArtists.map((artist, index) => ({
+    ...artist,
+    minutes: Math.round(artist.minutes),
+    hue: SAMPLE_ARTISTS[index % SAMPLE_ARTISTS.length].hue,
+  }));
+}
+
+// Made up, for examples that aren't about stats.lk's own numbers
+export function sampleArtists(): PreviewArtist[] {
   return SAMPLE_ARTISTS;
 }
 

@@ -70,6 +70,10 @@ export default function PrivacyPage() {
           By default, only you. In settings you can share your profile with friends or with everyone
           on stats.lk, and hide specific artists or tracks from others. Your data is never sold.
         </p>
+        <p className="mt-2">
+          The home page shows totals across everyone, never tied to a person. Its top artists come only from
+          live plays of accounts whose profile isn&apos;t private, without anything they hid.
+        </p>
       </section>
 
       <section>

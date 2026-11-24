@@ -128,6 +128,11 @@ export default async function AdminPage() {
                   <td className="px-4 py-2 whitespace-nowrap text-muted">{relative(row.lastSyncedMs)}</td>
                   <td className="px-4 py-2">
                     <Status user={row} />
+                    {row.unusualImport && (
+                      <span className="block text-xs text-amber-200" title={row.unusualImport}>
+                        Unusual import
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

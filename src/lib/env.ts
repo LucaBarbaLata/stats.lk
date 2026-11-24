@@ -35,6 +35,7 @@ export function appTimezone(): string {
   return requestPreferences().timezone ?? process.env.APP_TIMEZONE ?? "Europe/Bucharest";
 }
 
+// The least time between two requests for one user's recent plays
 export function syncIntervalMs(): number {
   const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? 3);
   return Math.max(1, minutes) * 60_000;

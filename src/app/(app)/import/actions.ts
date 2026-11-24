@@ -1,5 +1,6 @@
 "use server";
 
+import { checkImport, ImportRefusedError } from "@/lib/import/check";
 import { getImportProgress, type ImportProgressData } from "@/lib/import/progress";
 import { ImportLimitError, saveImportedStreams, validateRows } from "@/lib/import/save";
 import { getCurrentUser } from "@/lib/session";
@@ -25,6 +26,14 @@ export async function pollImportProgress(): Promise<ImportProgressData | null> {
   return user ? getImportProgress(user.id) : null;
 }
 
+// After the last chunk that was saved. The worker checks again every day,
+// as Spotify answers for more of the tracks.
+export async function finishImport(): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || tooFast(user.id)) return;
+  await checkImport(user.id);
+}
+
 // Receives one chunk of plays parsed in the browser.
 export async function importChunk(rows: unknown): Promise<ImportChunkResult> {
   const user = await getCurrentUser();
@@ -33,7 +42,7 @@ export async function importChunk(rows: unknown): Promise<ImportChunkResult> {
   try {
     return await saveImportedStreams(user.id, validateRows(rows));
   } catch (error) {
-    if (error instanceof ImportLimitError) return { error: `${error.message}.` };
+    if (error instanceof ImportLimitError || error instanceof ImportRefusedError) return { error: `${error.message}.` };
     throw error;
   }
 }

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { Accordion } from "@/components/accordion";
-import { ArtistImage, HeatmapPreview, HoursPreview, Panel, previewArtists, TopPreview } from "@/components/landing";
+import { ArtistImage, HeatmapPreview, HoursPreview, Panel, realArtists, sampleArtists, TopPreview } from "@/components/landing";
 import { Logo } from "@/components/logo";
 import { CountUp, InView, Reveal } from "@/components/motion";
 import { TrophyBadge } from "@/components/trophies";
 import { buttonClass } from "@/components/ui";
+import { emailAccess } from "@/lib/accounts";
 import { getCommunityStats } from "@/lib/community";
 import { getCurrentUser } from "@/lib/session";
 
@@ -50,7 +51,7 @@ const FAQ = [
   },
   {
     q: "Where do the numbers on this page come from?",
-    a: "The totals and charts come from everyone on stats.lk together, updated every hour, and never show one person's listening. The artists in the examples are made up.",
+    a: "The totals and charts come from everyone on stats.lk together, updated every hour, and never show one person's listening. Top artists only count live plays from accounts whose profile isn't private, without anything they hid. Where there aren't enough yet, the artists are made up.",
   },
   {
     q: "Is this made by Spotify?",
@@ -105,9 +106,9 @@ export default function LandingPage() {
               can open any day of the year. No subscription, nothing locked.
             </p>
             <div className="flex animate-rise flex-wrap items-center gap-3" style={{ animationDelay: "360ms" }}>
-              <Link href="/signup" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
-                Get started
-              </Link>
+              <Suspense fallback={<span className="h-12 w-36 rounded-full bg-surface" />}>
+                <StartButton />
+              </Suspense>
               <a href="#features" className={`${buttonClass("ghost")} h-12 px-5 text-base`}>
                 See what&apos;s inside
               </a>
@@ -155,7 +156,11 @@ export default function LandingPage() {
             icon={ChartColumn}
             title="Top lists with the numbers that matter"
             text="Tracks, artists, albums and genres for the last month, the last year, all time or any dates you pick. Every row shows how many times you played it and for how long."
-            preview={<TopListFeaturePreview />}
+            preview={
+              <Suspense fallback={<Panel className="h-80" />}>
+                <TopListFeaturePreview />
+              </Suspense>
+            }
           />
           <Feature
             reverse
@@ -251,12 +256,23 @@ export default function LandingPage() {
             <h2 className="text-2xl font-semibold tracking-tight">See your own numbers</h2>
             <p className="text-muted">Make an account, upload your Spotify history and see every year you&apos;ve listened.</p>
           </div>
-          <Link href="/signup" className={`${buttonClass("primary")} h-12 px-6 text-base`}>
-            Get started
-          </Link>
+          <Suspense fallback={<span className="h-12 w-36 rounded-full bg-surface" />}>
+            <StartButton />
+          </Suspense>
         </section>
       </main>
     </div>
+  );
+}
+
+// Signing up, or logging in while sign-ups are closed
+async function StartButton() {
+  await connection();
+  const { signups } = await emailAccess();
+  return (
+    <Link href={signups ? "/signup" : "/login"} className={`${buttonClass("primary")} h-12 px-6 text-base`}>
+      {signups ? "Get started" : "Log in"}
+    </Link>
   );
 }
 
@@ -269,14 +285,17 @@ async function HeaderActions() {
       </Link>
     );
   }
+  const { signups } = await emailAccess();
   return (
     <div className="flex items-center gap-1">
-      <Link href="/login" className={buttonClass("ghost", "sm")}>
+      <Link href="/login" className={buttonClass(signups ? "ghost" : "primary", "sm")}>
         Log in
       </Link>
-      <Link href="/signup" className={buttonClass("primary", "sm")}>
-        Get started
-      </Link>
+      {signups && (
+        <Link href="/signup" className={buttonClass("primary", "sm")}>
+          Get started
+        </Link>
+      )}
     </div>
   );
 }
@@ -292,7 +311,7 @@ function HeroSkeleton() {
 
 async function HeroPreview() {
   const stats = await communityStats();
-  const artists = previewArtists();
+  const real = realArtists(stats);
   const minutes = Math.round(stats?.minutesLast7Days ?? 1482);
   const previous = stats?.minutesPrevious7Days ?? 1256;
   const change = previous > 0 ? Math.round(((minutes - previous) / previous) * 100) : null;
@@ -301,10 +320,10 @@ async function HeroPreview() {
     <>
       <Panel className="relative z-10 animate-rise pb-10" style={{ animationDelay: "250ms" }}>
         <div className="mb-4 flex items-baseline justify-between">
-          <p className="font-semibold">Your top artists</p>
+          <p className="font-semibold">{real ? "Top artists on stats.lk" : "Your top artists"}</p>
           <p className="text-sm text-subtle">Last 30 days</p>
         </div>
-        <TopPreview rows={artists.slice(0, 4)} start={550} />
+        <TopPreview rows={(real ?? sampleArtists()).slice(0, 4)} start={550} />
       </Panel>
       <div className="relative z-20 -mt-4 ml-auto w-[78%] animate-float sm:-mt-6">
         <Panel className="animate-rise" style={{ animationDelay: "500ms" }}>
@@ -352,11 +371,12 @@ async function TotalsStrip() {
   );
 }
 
-function TopListFeaturePreview() {
+async function TopListFeaturePreview() {
+  const stats = await communityStats();
   return (
     <InView>
       <Panel>
-        <TopPreview rows={previewArtists().slice(0, 5)} onView />
+        <TopPreview rows={(realArtists(stats) ?? sampleArtists()).slice(0, 5)} onView />
       </Panel>
     </InView>
   );
@@ -377,7 +397,7 @@ async function ActivityFeaturePreview() {
 }
 
 function FriendsFeaturePreview() {
-  const [first, second] = previewArtists();
+  const [first, second] = sampleArtists();
   return (
     <InView>
       <Panel className="space-y-4">
@@ -411,7 +431,8 @@ async function WrappedFeaturePreview() {
   const stats = await communityStats();
   const year = stats?.thisYear.year ?? new Date().getFullYear();
   const minutes = Math.round(stats?.thisYear.minutes || 24310);
-  const topArtist = previewArtists()[0];
+  const [sample] = sampleArtists();
+  const topArtist = stats?.thisYear.topArtist ? { ...sample, ...stats.thisYear.topArtist } : sample;
   return (
     <div className="flex justify-center">
       <div className="w-60 animate-float rounded-[28px] bg-gradient-to-b from-[#0f3d22] to-background p-5 shadow-2xl shadow-black/50 ring-1 ring-border">

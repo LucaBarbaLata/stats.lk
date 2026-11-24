@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { tracks } from "../db/schema";
 import { linkImportedTracks } from "./link";
+import { refuseIfEdited } from "./check";
 import { EARLIEST_PLAY, IMPORT_CHUNK_SIZE, MAX_PLAY_MS, type ImportRow } from "./parse";
 
 const TRACK_ID = /^[0-9A-Za-z]{22}$/;
@@ -67,6 +68,7 @@ export async function saveImportedStreams(
   rows: ImportRow[],
 ): Promise<{ added: number; merged: number }> {
   if (!rows.length) return { added: 0, merged: 0 };
+  await refuseIfEdited(rows);
 
   const placeholders = [...new Map(rows.map((row) => [row.trackId, row])).values()].map(
     (row) => ({

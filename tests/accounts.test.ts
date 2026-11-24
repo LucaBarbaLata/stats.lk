@@ -6,6 +6,7 @@ import {
   changeEmail,
   changePassword,
   deleteUnconfirmedAccounts,
+  emailAccess,
   linkWorks,
   logIn,
   pendingEmail,
@@ -160,6 +161,17 @@ describe("signing up", () => {
     await createUser();
     assert.equal(await signupsOpen(), false);
     assert.deepEqual(await signUp(newAccount(), IP), { ok: false, error: "Sign-ups are closed for now. Try again later." });
+  });
+
+  it("only offers the email login where it can be of use", async () => {
+    await createUser();
+    assert.deepEqual(await emailAccess(), { signups: true, login: true });
+    process.env.MAX_ACCOUNTS = "1";
+    assert.deepEqual(await emailAccess(), { signups: false, login: false }, "only Spotify accounts");
+
+    process.env.MAX_ACCOUNTS = "2";
+    await confirmedAccount();
+    assert.deepEqual(await emailAccess(), { signups: false, login: true }, "full, but someone logs in with an email");
   });
 
   it("doesn't keep an account whose email couldn't be sent", async () => {

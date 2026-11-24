@@ -57,8 +57,16 @@ export function maxAccounts(): number {
 }
 
 export async function signupsOpen(): Promise<boolean> {
-  const [row] = await db.select({ total: count() }).from(users);
-  return row.total < maxAccounts();
+  return (await emailAccess()).signups;
+}
+
+// Whether people can sign up, and whether logging in with an email makes sense:
+// at the account limit it still does for those who have one, but on a server
+// where nobody does, the form would be of no use.
+export async function emailAccess(): Promise<{ signups: boolean; login: boolean }> {
+  const [row] = await db.select({ total: count(), withEmail: count(users.email) }).from(users);
+  const signups = row.total < maxAccounts();
+  return { signups, login: signups || row.withEmail > 0 };
 }
 
 async function findByEmail(email: string) {

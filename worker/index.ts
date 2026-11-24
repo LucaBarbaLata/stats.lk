@@ -2,8 +2,9 @@ import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { deleteUnconfirmedAccounts } from "@/lib/accounts";
 import { fetchMissingCatalogDetails, fetchMissingGenres } from "@/lib/catalog";
 import { db } from "@/lib/db";
-import { spotifyTokens, users, workerHeartbeat } from "@/lib/db/schema";
+import { nowPlaying, spotifyTokens, users, workerHeartbeat } from "@/lib/db/schema";
 import { syncIntervalMs } from "@/lib/env";
+import { checkDueImports } from "@/lib/import/check";
 import { linkImportedTracks } from "@/lib/import/link";
 import { refreshNowPlaying, staleNowPlayingUsers } from "@/lib/now-playing";
 import { fetchMissingPictures } from "@/lib/pictures";
@@ -12,6 +13,7 @@ import { pausedUntil, type SpotifyCall } from "@/lib/spotify/pauses";
 import { sendDueReminders } from "@/lib/reminders";
 import { refreshTopLists } from "@/lib/spotify/top";
 import { syncUser } from "@/lib/sync";
+import { SyncSchedule } from "@/lib/sync-schedule";
 
 const TICK_MS = 15_000;
 // How fresh "now playing" is kept while someone listens, and while they don't.
@@ -29,14 +31,16 @@ const TOP_LISTS_EVERY_MS = 6 * 60 * 60_000;
 const GENRES_PER_TICK = 40;
 // Deezer allows about 10 requests per second, and an artist can take three
 const PICTURES_PER_TICK = 40;
-// Sign-ups nobody confirmed are removed after a day, and import reminders go
-// out once a month; checking hourly is enough for both
+// Sign-ups nobody confirmed are removed after a day, import reminders go out
+// once a month and imports are checked once a day; hourly is enough for all
 const CLEANUP_EVERY_MS = 60 * 60_000;
+const IMPORT_CHECKS_PER_ROUND = 5;
 
 let busy = false;
 let stopping = false;
 let nextCatalogRound = 0;
 let nextCleanup = 0;
+const schedule = new SyncSchedule(syncIntervalMs());
 
 function stop() {
   stopping = true;
@@ -47,21 +51,16 @@ process.on("SIGINT", stop);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Users with working tokens whose last sync is older than the interval,
-// longest-waiting first.
-function dueUsers() {
-  const cutoff = new Date(Date.now() - syncIntervalMs());
-  return db
-    .select({ id: users.id, displayName: users.displayName })
+// Users with working tokens who may have new plays, longest-waiting first.
+async function dueUsers() {
+  schedule.watch(await db.select({ userId: nowPlaying.userId, trackId: nowPlaying.trackId }).from(nowPlaying));
+  const connected = await db
+    .select({ id: users.id, displayName: users.displayName, lastSyncedAt: users.lastSyncedAt })
     .from(users)
     .innerJoin(spotifyTokens, eq(spotifyTokens.userId, users.id))
-    .where(
-      and(
-        isNull(spotifyTokens.revokedAt),
-        or(isNull(users.lastSyncedAt), lt(users.lastSyncedAt, cutoff)),
-      ),
-    )
+    .where(isNull(spotifyTokens.revokedAt))
     .orderBy(sql`${users.lastSyncedAt} asc nulls first`);
+  return connected.filter((user) => schedule.isDue(user));
 }
 
 // Users with working tokens whose top lists are old or were never stored.
@@ -126,6 +125,8 @@ async function tick() {
     if (deleted) console.log(`Deleted ${deleted} sign-ups that were never confirmed`);
     const reminded = await sendDueReminders();
     if (reminded) console.log(`Sent ${reminded} import reminders`);
+    const checked = await checkDueImports(IMPORT_CHECKS_PER_ROUND);
+    if (checked) console.log(`Checked the imports of ${checked} users`);
   }
   if (Date.now() >= nextCatalogRound) {
     nextCatalogRound = Date.now() + CATALOG_ROUND_MS;
@@ -145,7 +146,7 @@ async function tick() {
 }
 
 async function main() {
-  console.log(`Worker started, syncing every ${syncIntervalMs() / 60_000} min`);
+  console.log(`Worker started, syncing when tracks end, at most every ${syncIntervalMs() / 60_000} min`);
   if (!process.env.LASTFM_API_KEY) console.log("LASTFM_API_KEY not set, skipping genres");
   // Imports link their tracks as they're saved; this catches any left behind
   await linkImportedTracks();
