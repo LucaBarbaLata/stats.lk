@@ -2,11 +2,12 @@ import { computeStreaks, formatDay, today } from "../dates";
 import { formatMinutes, formatNumber } from "../format";
 import { levelFor } from "../levels";
 import { yearRange } from "../periods";
-import { PRESETS, type Range } from "../ranges";
+import { presetRange, rangeLabel, type Range } from "../ranges";
 import {
   getActivity,
   getDailyTotals,
   getPeriodTotals,
+  getStatsEnd,
   getTopAlbums,
   getTopArtists,
   getTopGenres,
@@ -43,15 +44,19 @@ const RANGE_LABELS: Record<string, string> = {
 
 const RANKING_TITLES = { "top-artists": "My top artists", "top-tracks": "My top tracks", "top-albums": "My top albums" };
 
-const presetRange = (key: string): Range => ({ ...(PRESETS.find((preset) => preset.key === key) ?? PRESETS[0]) });
+// "Last 4 weeks", or "4 weeks to Oct 3, 2026" when it ends at the newest play
+const presetLabel = (range: Range): string =>
+  range.key !== "custom" && range.endsAt ? rangeLabel(range) : (RANGE_LABELS[range.key] ?? range.label);
 
 const minutesItem = (item: TopItem): ShareItem => ({ ...item, subtitle: `${formatMinutes(item.msPlayed)} minutes` });
 const plainItem = ({ id, name, imageUrl, subtitle }: TopItem): ShareItem => ({ id, name, imageUrl, subtitle });
 
 export async function loadShareData(userId: string, config: ShareConfig): Promise<ShareData> {
+  // Without Spotify, preset periods end at the newest play
+  const { endsAt } = await getStatsEnd(userId);
   if (isRanking(config.card)) {
     const limit = RANKING_LAYOUTS.find((layout) => layout.key === config.layout)?.items ?? 5;
-    const range = presetRange(config.range);
+    const range = presetRange(config.range, endsAt);
     const items =
       config.card === "top-artists"
         ? (await getTopArtists(userId, range, "minutes", limit, publicOnly)).map(minutesItem)
@@ -61,14 +66,18 @@ export async function loadShareData(userId: string, config: ShareConfig): Promis
     return {
       kind: "ranking",
       title: RANKING_TITLES[config.card],
-      subtitle: RANGE_LABELS[range.key],
+      subtitle: presetLabel(range),
       items,
       round: config.card === "top-artists",
     };
   }
 
   const wrapped = config.card === "wrapped";
-  const range = wrapped ? yearRange(config.year) : /^\d{4}$/.test(config.period) ? yearRange(Number(config.period)) : presetRange(config.period);
+  const range = wrapped
+    ? yearRange(config.year)
+    : /^\d{4}$/.test(config.period)
+      ? yearRange(Number(config.period))
+      : presetRange(config.period, endsAt);
   const wanted = wrapped ? WRAPPED_STATS : config.stats;
   // Only load what fits on the card
   const stats = planStats(config.layout as SummaryLayout, wanted).rows.flatMap((row) => row.stats);
@@ -128,9 +137,7 @@ export async function loadShareData(userId: string, config: ShareConfig): Promis
     title: wrapped ? `My ${config.year} Wrapped` : config.title,
     subtitle: wrapped
       ? `${formatNumber(totals?.streams ?? 0)} plays`
-      : range.key === "custom"
-        ? range.label
-        : RANGE_LABELS[range.key],
+      : presetLabel(range),
     stats: wanted,
     values,
     picture: artists[0]?.imageUrl ?? tracks[0]?.imageUrl ?? albums[0]?.imageUrl ?? null,

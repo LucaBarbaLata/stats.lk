@@ -11,7 +11,10 @@ export type AdminUser = {
   createdMs: number;
   lastSyncedMs: number | null;
   syncError: string | null;
-  tokenRevoked: boolean;
+  // Whether Spotify is connected; accounts with only an email have none
+  spotify: "none" | "connected" | "revoked";
+  // Signed up with an email and hasn't confirmed it yet
+  unconfirmed: boolean;
   streams: number;
   imported: number;
   lastPlayedMs: number | null;
@@ -23,7 +26,8 @@ export function getAdminUsers(): Promise<AdminUser[]> {
   return db.execute<AdminUser>(sql`
     select u.id, u.username, u.display_name as "displayName", u.visibility::text as visibility,
       ${epochMs("u.created_at")} as "createdMs", ${epochMs("u.last_synced_at")} as "lastSyncedMs",
-      u.sync_error as "syncError", coalesce(st.revoked_at is not null, true) as "tokenRevoked",
+      u.sync_error as "syncError", case when st.user_id is null then 'none' when st.revoked_at is null then 'connected' else 'revoked' end as spotify,
+      u.spotify_id is null and u.email_verified_at is null as unconfirmed,
       coalesce(s.streams, 0)::int as streams, coalesce(s.imported, 0)::int as imported,
       ${epochMs("s.last_played")} as "lastPlayedMs"
     from users u

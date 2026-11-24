@@ -1,10 +1,60 @@
 "use client";
 
-import { Check } from "lucide-react";
-import { useActionState, useState, type ReactNode } from "react";
+import { Check, Eye, EyeOff } from "lucide-react";
+import { useActionState, useId, useState, type ReactNode } from "react";
 import type { FormState } from "@/app/(app)/settings/actions";
-import { SettingsHeader } from "@/components/settings-ui";
+import { inputClass, SettingsHeader } from "@/components/settings-ui";
 import { buttonClass } from "@/components/ui";
+import { PASSWORD_MAX } from "@/lib/account-rules";
+
+// A labelled password field with a show/hide button, for settings cards
+export function PasswordInput({
+  label,
+  name,
+  autoComplete,
+  hint,
+}: {
+  label: string;
+  name: string;
+  autoComplete: "current-password" | "new-password";
+  hint?: string;
+}) {
+  const id = useId();
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="space-y-2">
+      <label htmlFor={id} className="block text-sm text-muted">
+        {label}
+      </label>
+      <div className="relative max-w-sm">
+        <input
+          id={id}
+          name={name}
+          type={shown ? "text" : "password"}
+          autoComplete={autoComplete}
+          required
+          maxLength={PASSWORD_MAX}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          className={`${inputClass} pr-11`}
+        />
+        <button
+          type="button"
+          onClick={() => setShown(!shown)}
+          aria-label={shown ? "Hide password" : "Show password"}
+          aria-pressed={shown}
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-subtle transition hover:text-foreground focus-visible:text-foreground"
+        >
+          {shown ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+        </button>
+      </div>
+      {hint && (
+        <p id={`${id}-hint`} className="text-xs text-subtle">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
 
 // A settings form whose result ("Saved", or what's wrong) shows next to its
 // button. `action` is a server action taking (previous state, form data).

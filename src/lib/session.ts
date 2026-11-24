@@ -13,6 +13,8 @@ import { requestPreferences } from "./preferences";
 const SESSION_COOKIE = "statslk_session";
 // Holds the OAuth `state` between /api/auth/login and /api/auth/callback
 export const OAUTH_STATE_COOKIE = "statslk_oauth_state";
+// Starts the state when Spotify is being connected to the logged-in account
+export const CONNECT_STATE_PREFIX = "connect.";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Stores a new session and returns the cookie to set on the response.

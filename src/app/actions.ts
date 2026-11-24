@@ -15,11 +15,15 @@ import {
   sendFriendRequest,
   type NowPlayingEntry,
 } from "@/lib/social";
+import { hasSpotifyTokens } from "@/lib/spotify/tokens";
 import { syncUser } from "@/lib/sync";
 
 const MIN_SYNC_GAP_MS = 30_000;
-// The viewer's own now playing is fetched from Spotify when older than this
-const OWN_NOW_PLAYING_MAX_AGE_MS = 10_000;
+// The viewer's own now playing is fetched from Spotify when older than this.
+// The page polls every 15 seconds: every poll asks while something plays,
+// every other one while nothing does.
+const OWN_PLAYING_MAX_AGE_MS = 10_000;
+const OWN_IDLE_MAX_AGE_MS = 25_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function requireViewer() {
@@ -39,14 +43,14 @@ export async function logout() {
 }
 
 // Called while the app is open (src/components/live-sync.tsx), so fresh
-// plays show up without waiting for the worker. Returns how many plays this
+// plays show up without waiting for the worker. Accounts without Spotify skip it. Returns how many plays this
 // call stored and when the latest saved play was (epoch ms), so the page can
 // also notice plays the worker saved.
 export async function syncNow(): Promise<{ added: number; latestMs: number | null }> {
   const user = await getCurrentUser();
   if (!user) return { added: 0, latestMs: null };
   const due = !user.lastSyncedAt || Date.now() - user.lastSyncedAt.getTime() >= MIN_SYNC_GAP_MS;
-  const added = due ? await syncUser(user.id).catch(() => 0) : 0;
+  const added = due && (await hasSpotifyTokens(user.id)) ? await syncUser(user.id).catch(() => 0) : 0;
   const [row] = await db.execute<{ latestMs: number | null }>(sql`
     select (extract(epoch from max(played_at)) * 1000)::float8 as "latestMs"
     from streams where user_id = ${user.id}::uuid`);
@@ -62,10 +66,11 @@ export async function pollNowPlaying(userIds: unknown): Promise<NowPlayingEntry[
 
   if (ids.includes(viewer.id)) {
     const [own] = await db
-      .select({ fetchedAt: nowPlaying.fetchedAt })
+      .select({ fetchedAt: nowPlaying.fetchedAt, isPlaying: nowPlaying.isPlaying })
       .from(nowPlaying)
       .where(eq(nowPlaying.userId, viewer.id));
-    if (!own || Date.now() - own.fetchedAt.getTime() > OWN_NOW_PLAYING_MAX_AGE_MS) {
+    const maxAge = own?.isPlaying ? OWN_PLAYING_MAX_AGE_MS : OWN_IDLE_MAX_AGE_MS;
+    if (!own || Date.now() - own.fetchedAt.getTime() > maxAge) {
       await refreshNowPlaying(viewer.id).catch(() => {});
     }
   }

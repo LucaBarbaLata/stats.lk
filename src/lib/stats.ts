@@ -21,7 +21,25 @@ function rangeSql(range: Range, column: SQL = sql`s.played_at`): SQL {
     return sql`${column} >= (${range.from}::date)::timestamp at time zone ${tz}
       and ${column} < ((${range.to}::date) + 1)::timestamp at time zone ${tz}`;
   }
-  return range.days ? sql`${column} >= now() - make_interval(days => ${range.days}::int)` : sql`true`;
+  if (!range.days) return sql`true`;
+  const end = range.endsAt ? sql`${range.endsAt.toISOString()}::timestamptz` : sql`now()`;
+  return sql`${column} >= ${end} - make_interval(days => ${range.days}::int)`;
+}
+
+export type StatsEnd = {
+  // Spotify is connected, so plays keep coming in
+  live: boolean;
+  // Where ranges like "the last 4 weeks" end: null for now (live, or no
+  // plays yet), else the newest play
+  endsAt: Date | null;
+};
+
+export async function getStatsEnd(userId: string): Promise<StatsEnd> {
+  const [row] = await db.execute<{ live: boolean; lastMs: number | null }>(sql`
+    select exists (select 1 from spotify_tokens where user_id = ${userId}) as live,
+      (extract(epoch from (select max(played_at) from streams where user_id = ${userId})) * 1000)::float8 as "lastMs"`);
+  const live = Boolean(row?.live);
+  return { live, endsAt: live || row?.lastMs == null ? null : new Date(row.lastMs) };
 }
 
 function subjectSql(subject: Subject): SQL {
@@ -233,13 +251,16 @@ export async function getActivity(
 }
 
 // Minutes per local day ("2024-03-01"), from `sinceDays` days ago.
-export async function getDailyMinutes(userId: string, sinceDays: number): Promise<Bucket[]> {
+// Minutes per local day over the `sinceDays` days before now, or before
+// `endsAt` for accounts whose stats stop at their last import (getStatsEnd)
+export async function getDailyMinutes(userId: string, sinceDays: number, endsAt: Date | null = null): Promise<Bucket[]> {
   const tz = appTimezone();
+  const end = endsAt ? sql`${endsAt.toISOString()}::timestamptz` : sql`now()`;
   return db.execute<Bucket>(sql`
     select to_char((s.played_at at time zone ${tz})::date, 'YYYY-MM-DD') as key,
       count(*)::int as streams, sum(s.ms_played)::float8 as "msPlayed"
     from streams s
-    where s.user_id = ${userId} and s.played_at >= now() - make_interval(days => ${sinceDays}::int)
+    where s.user_id = ${userId} and s.played_at >= ${end} - make_interval(days => ${sinceDays}::int)
     group by 1
     order by 1`);
 }
@@ -468,12 +489,15 @@ export async function getNewArtists(userId: string, range: Range, limit: number)
 export type ForgottenTrack = TopItem & { lastMs: number };
 
 // Tracks played at least `minPlays` times but not in the last `idleDays` days
+// (before now, or before `endsAt`, see getStatsEnd)
 export async function getForgottenTracks(
   userId: string,
   minPlays: number,
   idleDays: number,
   limit: number,
+  endsAt: Date | null = null,
 ): Promise<ForgottenTrack[]> {
+  const end = endsAt ? sql`${endsAt.toISOString()}::timestamptz` : sql`now()`;
   return db.execute<ForgottenTrack>(sql`
     select t.id, t.name, al.image_url as "imageUrl",
       coalesce(
@@ -487,7 +511,7 @@ export async function getForgottenTracks(
     left join albums al on al.id = t.album_id
     where s.user_id = ${userId}
     group by t.id, al.id
-    having count(*) >= ${minPlays}::int and max(s.played_at) < now() - make_interval(days => ${idleDays}::int)
+    having count(*) >= ${minPlays}::int and max(s.played_at) < ${end} - make_interval(days => ${idleDays}::int)
     order by streams desc, t.name
     limit ${limit}`);
 }

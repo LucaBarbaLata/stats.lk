@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { SpotifyCall } from "../spotify/pauses";
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -21,7 +22,13 @@ export const profileVisibility = pgEnum("profile_visibility", ["private", "frien
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  spotifyId: text("spotify_id").notNull().unique(),
+  // Empty for accounts made with an email until they connect Spotify
+  spotifyId: text("spotify_id").unique(),
+  // Own login: a lowercase email and a scrypt hash (src/lib/passwords.ts).
+  // Empty for Spotify accounts that haven't added them.
+  email: text("email").unique(),
+  emailVerifiedAt: timestamptz("email_verified_at"),
+  passwordHash: text("password_hash"),
   // Public handle for profile links (/u/<username>); lowercase, see src/lib/usernames.ts
   username: text("username").notNull().unique(),
   displayName: text("display_name").notNull(),
@@ -45,6 +52,10 @@ export const users = pgTable("users", {
   syncError: text("sync_error"),
   // When the worker last stored the user's Spotify top lists
   topListsFetchedAt: timestamptz("top_lists_fetched_at"),
+  // Opt-in monthly email when the history is over 30 days old, for accounts
+  // without Spotify (src/lib/reminders.ts)
+  importReminders: boolean("import_reminders").notNull().default(false),
+  reminderSentAt: timestamptz("reminder_sent_at"),
 });
 
 // Kept apart from `users` so that selecting a user never pulls tokens along.
@@ -75,6 +86,28 @@ export const sessions = pgTable(
     userAgent: text("user_agent"),
   },
   (t) => [index("sessions_user_id").on(t.userId)],
+);
+
+export type EmailTokenPurpose = "verify" | "reset";
+
+// Single-use links sent by email: confirming the address, resetting the password
+export const emailTokens = pgTable(
+  "email_tokens",
+  {
+    // SHA-256 of the token in the link, as for sessions
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    purpose: text("purpose").$type<EmailTokenPurpose>().notNull(),
+    // Where the link went. A reset only works while that is still the
+    // account's email; a verify link to another address (sent from Settings)
+    // moves the login there.
+    email: text("email").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    expiresAt: timestamptz("expires_at").notNull(),
+  },
+  (t) => [index("email_tokens_user_id").on(t.userId)],
 );
 
 export const artists = pgTable(
@@ -241,9 +274,15 @@ export const hiddenItems = pgTable(
 export const workerHeartbeat = pgTable("worker_heartbeat", {
   id: integer("id").primaryKey().default(1),
   beatAt: timestamptz("beat_at").notNull(),
-  // Spotify's rate limit stopped catalog lookups until then; kept here so a
-  // restart doesn't ask again too early
-  catalogPausedUntil: timestamptz("catalog_paused_until"),
+});
+
+// Kinds of requests Spotify refused, and until when it asked us to wait
+// (src/lib/spotify/pauses.ts). Rows stay after the wait is over.
+export const spotifyPauses = pgTable("spotify_pauses", {
+  call: text("call").$type<SpotifyCall>().primaryKey(),
+  until: timestamptz("until").notNull(),
+  // What Spotify answered, for the admin panel, e.g. "QUOTA_EXCEEDED"
+  reason: text("reason").notNull(),
 });
 
 export type User = typeof users.$inferSelect;

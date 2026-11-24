@@ -15,14 +15,19 @@ function useNowPlaying(userIds: string[], initial: NowPlayingEntry[], live = tru
   useEffect(() => {
     if (!live) return;
     let cancelled = false;
-    const poll = () =>
+    // Tabs in the background don't poll, and catch up when they're shown again
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
       pollNowPlaying(key.split(",").filter(Boolean))
         .then((next) => !cancelled && setEntries(next))
         .catch(() => {});
+    };
     const timer = setInterval(poll, POLL_MS);
+    document.addEventListener("visibilitychange", poll);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
     };
   }, [key, live]);
   return entries;

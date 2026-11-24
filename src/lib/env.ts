@@ -20,8 +20,9 @@ export function contactEmail(): string | null {
   return process.env.CONTACT_EMAIL || null;
 }
 
-// Spotify user IDs allowed to open /admin
-export function isAdmin(spotifyId: string): boolean {
+// Spotify user IDs allowed to open /admin. Accounts without Spotify never are.
+export function isAdmin(spotifyId: string | null): boolean {
+  if (!spotifyId) return false;
   return (process.env.ADMIN_SPOTIFY_IDS ?? "")
     .split(",")
     .map((id) => id.trim())

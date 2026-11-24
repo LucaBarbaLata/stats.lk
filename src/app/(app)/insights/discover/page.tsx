@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
 import { parseRange, rangeStart } from "@/lib/ranges";
 import { requireUser } from "@/lib/session";
-import { getFirstPlayedAt, getForgottenTracks, getListeningTotals, getNewArtists } from "@/lib/stats";
+import { getFirstPlayedAt, getForgottenTracks, getListeningTotals, getNewArtists, getStatsEnd } from "@/lib/stats";
 
 // A track counts as forgotten after this many plays and this long without one
 const FORGOTTEN_MIN_PLAYS = 10;
@@ -20,11 +20,12 @@ export const metadata: Metadata = { title: "Discover" };
 export default async function DiscoverPage({ searchParams }: PageProps<"/insights/discover">) {
   const query = await searchParams;
   const user = await requireUser();
-  const range = parseRange(query);
+  const { endsAt } = await getStatsEnd(user.id);
+  const range = parseRange(query, "4w", endsAt);
 
   const [newArtists, forgotten, firstPlayedAt, totals] = await Promise.all([
     getNewArtists(user.id, range, 50),
-    getForgottenTracks(user.id, FORGOTTEN_MIN_PLAYS, FORGOTTEN_IDLE_DAYS, 30),
+    getForgottenTracks(user.id, FORGOTTEN_MIN_PLAYS, FORGOTTEN_IDLE_DAYS, 30, endsAt),
     getFirstPlayedAt(user.id),
     getListeningTotals(user.id),
   ]);
@@ -81,7 +82,7 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/insight
       <Section
         icon={History}
         title="Forgotten favourites"
-        description={`Tracks you played at least ${FORGOTTEN_MIN_PLAYS} times but not in the last ${FORGOTTEN_IDLE_DAYS} days.`}
+        description={`Tracks you played at least ${FORGOTTEN_MIN_PLAYS} times but not in the ${FORGOTTEN_IDLE_DAYS} days ${endsAt ? `before ${formatDate(endsAt)}` : "until today"}.`}
       >
         {forgotten.length ? (
           <TopList

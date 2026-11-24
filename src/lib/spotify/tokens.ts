@@ -22,6 +22,12 @@ export async function saveTokens(userId: string, tokens: TokenResponse): Promise
     .onConflictDoUpdate({ target: spotifyTokens.userId, set: values });
 }
 
+// Whether the user ever connected Spotify (accounts made with an email may not have)
+export async function hasSpotifyTokens(userId: string): Promise<boolean> {
+  const [row] = await db.select({ userId: spotifyTokens.userId }).from(spotifyTokens).where(eq(spotifyTokens.userId, userId));
+  return Boolean(row);
+}
+
 // Returns a valid access token for the user, refreshing it when needed.
 export async function getAccessToken(userId: string): Promise<string> {
   const [row] = await db.select().from(spotifyTokens).where(eq(spotifyTokens.userId, userId));

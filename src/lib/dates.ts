@@ -7,8 +7,13 @@ import { appTimezone } from "./env";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function today(): string {
+  return dayOf(new Date());
+}
+
+// The local day a moment falls on
+export function dayOf(date: Date): string {
   // en-CA formats dates as YYYY-MM-DD
-  return new Intl.DateTimeFormat("en-CA", { timeZone: appTimezone() }).format(new Date());
+  return new Intl.DateTimeFormat("en-CA", { timeZone: appTimezone() }).format(date);
 }
 
 const toUtc = (day: string) => Date.parse(`${day}T00:00:00Z`);

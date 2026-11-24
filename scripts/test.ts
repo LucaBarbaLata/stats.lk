@@ -29,6 +29,10 @@ async function main() {
     env: {
       ...process.env,
       DATABASE_URL: test.href,
+      APP_URL: "http://127.0.0.1:3000",
+      // No SMTP: emails land in an outbox the tests read (src/lib/email.ts)
+      SMTP_HOST: "",
+      MAX_ACCOUNTS: "",
       SPOTIFY_CLIENT_ID: "test",
       SPOTIFY_CLIENT_SECRET: "test",
       TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),

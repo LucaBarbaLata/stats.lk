@@ -1,9 +1,10 @@
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
-import { albumArtists, albums, artists, streams, trackArtists, tracks, workerHeartbeat } from "./db/schema";
+import { albumArtists, albums, artists, streams, trackArtists, tracks } from "./db/schema";
 import { absorbImportedAlbums, absorbImportedArtists, removeUnusedImported } from "./import/link";
 import { getArtistGenres } from "./lastfm";
 import { getAppAccessToken, pickImage, spotifyGet, SpotifyError } from "./spotify/api";
+import { pausedUntil } from "./spotify/pauses";
 import type { SpotifyArtist, SpotifySimpleArtist, SpotifyTrack } from "./spotify/types";
 
 // Store tracks (with their albums and artists) as returned by the Web API.
@@ -251,19 +252,12 @@ export async function fetchMissingArtistDetails(limit: number): Promise<number> 
 // caller's syncing and now playing carry on.
 export async function fetchMissingCatalogDetails(limit: number): Promise<{ tracks: number; artists: number }> {
   const fetched = { tracks: 0, artists: 0 };
-  const [heartbeat] = await db.select({ pausedUntil: workerHeartbeat.catalogPausedUntil }).from(workerHeartbeat);
-  if (heartbeat?.pausedUntil && heartbeat.pausedUntil.getTime() > Date.now()) return fetched;
+  if (await pausedUntil("catalog")) return fetched;
   try {
     fetched.artists = await fetchMissingArtistDetails(limit);
     fetched.tracks = await fetchMissingTrackDetails(limit - fetched.artists);
   } catch (error) {
     if (!(error instanceof SpotifyError && error.status === 429)) throw error;
-    const seconds = error.retryAfterSeconds ?? 30;
-    await db
-      .update(workerHeartbeat)
-      .set({ catalogPausedUntil: new Date(Date.now() + seconds * 1000) })
-      .where(eq(workerHeartbeat.id, 1));
-    console.warn(`${error.message}, pausing catalog lookups for ${seconds}s`);
   }
   return fetched;
 }

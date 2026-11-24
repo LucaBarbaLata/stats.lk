@@ -21,7 +21,7 @@ const TIMINGS = [
 const FAQ = [
   {
     q: "Why can't stats.lk get my history by itself?",
-    a: "Spotify only lets us see your last 50 plays. Your full history is only in this export, and only you can ask for it.",
+    a: "Spotify doesn't share listening history with apps like this one: at most the last 50 plays, and only for 5 invited accounts. Your full history is only in this export, and only you can ask for it.",
   },
   {
     q: "What about the “Account data” option?",
@@ -33,7 +33,7 @@ const FAQ = [
   },
   {
     q: "Do I have to do this again later?",
-    a: "No. After the import, stats.lk keeps saving your plays by itself.",
+    a: "Your stats stop at the newest play in the export, so upload a newer one now and then. Plays you already have stay and only new ones are added. In Settings, under Your data, you can ask for a monthly reminder email. Invited accounts with Spotify connected are kept up to date by themselves.",
   },
 ];
 
@@ -82,7 +82,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Wait for Spotify",
-    body: "Spotify says it can take up to 30 days, but it's usually a few days. Nothing is lost meanwhile: stats.lk keeps saving everything you play.",
+    body: "Spotify says it can take up to 30 days, but it's usually a few days. Nothing is lost meanwhile: the export has everything up to the day you asked, and a newer one later adds the rest.",
     visual: (
       <Frame address="Meanwhile">
         <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
@@ -90,7 +90,7 @@ const STEPS: Step[] = [
             <CalendarClock className="size-8" />
           </span>
           <p className="text-lg font-semibold">Usually a few days</p>
-          <p className="max-w-xs text-sm text-muted">Keep listening. Your plays are saved here every few minutes.</p>
+          <p className="max-w-xs text-sm text-muted">Keep listening. The email from Spotify says when it&apos;s ready.</p>
         </div>
       </Frame>
     ),
@@ -152,8 +152,8 @@ export default function GuidePage() {
               Get your full Spotify history
             </h1>
             <p className="max-w-xl text-lg text-pretty text-muted">
-              Spotify only lets us see your last 50 plays. To get stats from the day you made your
-              account, ask Spotify for a copy of your listening history and upload it here.
+              Your stats come from your listening history, and only Spotify has it. Ask Spotify for a copy and
+              upload it here: your stats then go back to the day you made your Spotify account.
             </p>
           </div>
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">

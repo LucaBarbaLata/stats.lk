@@ -1,5 +1,6 @@
 import { CalendarRange } from "lucide-react";
 import { buttonClass, Segmented } from "@/components/ui";
+import { formatDate } from "@/lib/dates";
 import { PRESETS, type Range } from "@/lib/ranges";
 
 // The one filter row above a page's stats: range presets, a custom range,
@@ -63,6 +64,12 @@ export function RangeFilter({
           <button className={`${buttonClass("primary", "sm")} h-9`}>Apply</button>
         </form>
       </details>
+      {/* Accounts without Spotify count back from their newest play */}
+      {range.key !== "custom" && range.endsAt && (
+        <p className="basis-full text-sm text-subtle">
+          Counted back from your newest play, {formatDate(range.endsAt)}.
+        </p>
+      )}
     </div>
   );
 }

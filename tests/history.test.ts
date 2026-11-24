@@ -4,7 +4,10 @@ import { addDays, startOfWeek, today } from "@/lib/dates";
 import { getEras, getOnThisDay } from "@/lib/history";
 import { comparePeriods } from "@/lib/periods";
 import { weekdayOrder } from "@/lib/series";
-import { getPlaysOnDay } from "@/lib/stats";
+import { db } from "@/lib/db";
+import { spotifyTokens } from "@/lib/db/schema";
+import { presetRange, rangeLabel } from "@/lib/ranges";
+import { getDailyMinutes, getPlaysOnDay, getStatsEnd, getTopArtists } from "@/lib/stats";
 import { addPlay, addTrack, closeDatabase, createUser, resetDatabase, spotifyId } from "./helpers";
 
 const ONE = spotifyId("one");
@@ -28,6 +31,18 @@ describe("a day's plays", () => {
 
     const utc = await getPlaysOnDay(user.id, "2026-08-15", "UTC");
     assert.deepEqual(utc.map((play) => play.time), ["20:30"]);
+  });
+
+  it("counts days back from the last play for accounts without Spotify", async () => {
+    const user = await createUser();
+    await addTrack(ONE, spotifyId("a"), "Artist");
+    await addPlay(user.id, ONE, "2025-03-01T12:00:00Z");
+    await addPlay(user.id, ONE, "2025-03-10T12:00:00Z");
+    await addPlay(user.id, ONE, "2025-03-20T12:00:00Z");
+
+    assert.equal((await getDailyMinutes(user.id, 15)).length, 0, "nothing in the last 15 days");
+    const days = await getDailyMinutes(user.id, 15, new Date("2025-03-20T12:00:00Z"));
+    assert.deepEqual(days.map((day) => day.key), ["2025-03-10", "2025-03-20"]);
   });
 
   it("names the artist and has nothing for an empty day", async () => {
@@ -125,5 +140,36 @@ describe("the start of the week", () => {
     const { current, previous } = comparePeriods("week", "2026-11-04", 7);
     assert.ok(current.key === "custom" && current.from === "2026-11-01");
     assert.ok(previous.key === "custom" && previous.from === "2026-10-25");
+  });
+});
+
+describe("ranges for accounts without Spotify", () => {
+  beforeEach(resetDatabase);
+
+  it("end at the newest play, so short ranges still show something", async () => {
+    const user = await createUser();
+    await addTrack(ONE, spotifyId("a"), "Artist");
+    await addPlay(user.id, ONE, "2025-03-01T12:00:00Z");
+    await addPlay(user.id, ONE, "2025-03-20T12:00:00Z");
+
+    const end = await getStatsEnd(user.id);
+    assert.equal(end.live, false);
+    assert.equal(end.endsAt?.toISOString(), "2025-03-20T12:00:00.000Z");
+
+    assert.equal((await getTopArtists(user.id, presetRange("4w"), "plays", 5)).length, 0, "nothing in the 4 weeks to today");
+    const [artist] = await getTopArtists(user.id, presetRange("4w", end.endsAt), "plays", 5);
+    assert.equal(artist.streams, 2);
+    assert.equal(rangeLabel(presetRange("4w", end.endsAt)), "4 weeks to Mar 20, 2025");
+    assert.equal(rangeLabel(presetRange("4w")), "Last 4 weeks");
+    assert.equal(rangeLabel(presetRange("all", end.endsAt)), "All time");
+  });
+
+  it("end now with Spotify connected, and for accounts with no plays", async () => {
+    const user = await createUser();
+    assert.deepEqual(await getStatsEnd(user.id), { live: false, endsAt: null });
+    await addTrack(ONE, spotifyId("a"), "Artist");
+    await addPlay(user.id, ONE, "2025-03-20T12:00:00Z");
+    await db.insert(spotifyTokens).values({ userId: user.id, accessToken: "a", refreshToken: "r", expiresAt: new Date(), scope: "" });
+    assert.deepEqual(await getStatsEnd(user.id), { live: true, endsAt: null });
   });
 });

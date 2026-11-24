@@ -13,7 +13,7 @@ assert.equal(
 );
 
 export async function resetDatabase() {
-  await db.execute(sql`truncate users, tracks, artists, albums, worker_heartbeat cascade`);
+  await db.execute(sql`truncate users, tracks, artists, albums, worker_heartbeat, spotify_pauses cascade`);
 }
 
 export const closeDatabase = () => client.end();

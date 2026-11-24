@@ -12,16 +12,14 @@ import { TrophyBadges } from "@/components/trophy-badges";
 import { buttonClass, EmptyState, Section } from "@/components/ui";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { PRESETS } from "@/lib/ranges";
+import { presetRange, rangeLabel } from "@/lib/ranges";
 import { levelFor } from "@/lib/levels";
 import { getCurrentUser } from "@/lib/session";
 import { evaluateTrophies } from "@/lib/trophies";
 import { getTrophyMetrics } from "@/lib/trophy-metrics";
 import { normalizeUsername } from "@/lib/usernames";
 import { canView, getNowPlaying, getRelation, getTasteMatch } from "@/lib/social";
-import { getTopArtists, getTopGenres, getTopTracks } from "@/lib/stats";
-
-const LAST_4_WEEKS = PRESETS[0];
+import { getStatsEnd, getTopArtists, getTopGenres, getTopTracks } from "@/lib/stats";
 
 const VISIBILITY_LABEL = {
   private: "Only you can see your profile",
@@ -111,14 +109,19 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
 
   // Others don't see what the owner hid; the owner sees everything
   const publicView = { publicOnly: !isSelf };
+  // Without Spotify, the owner's 4 weeks end at their newest play
+  const ownerEnd = await getStatsEnd(owner.id);
+  const last4Weeks = presetRange("4w", ownerEnd.endsAt);
   const [listening, artists, tracks, genres, match, metrics] = await Promise.all([
     getNowPlaying(viewer?.id ?? null, [owner.id]),
-    getTopArtists(owner.id, LAST_4_WEEKS, "minutes", 10, publicView),
-    getTopTracks(owner.id, LAST_4_WEEKS, "plays", 10, publicView),
-    getTopGenres(owner.id, LAST_4_WEEKS, "minutes", 6, publicView),
+    getTopArtists(owner.id, last4Weeks, "minutes", 10, publicView),
+    getTopTracks(owner.id, last4Weeks, "plays", 10, publicView),
+    getTopGenres(owner.id, last4Weeks, "minutes", 6, publicView),
     viewer && !isSelf ? getTasteMatch(viewer.id, owner.id) : null,
     getTrophyMetrics(owner.id),
   ]);
+  // Your own card polls Spotify, so only with Spotify connected
+  const ownLive = isSelf && ownerEnd.live;
   const trophies = evaluateTrophies(metrics);
 
   return (
@@ -143,7 +146,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
       </section>
 
       {isSelf ? (
-        <MyNowPlaying userId={owner.id} initial={listening} />
+        ownLive && <MyNowPlaying userId={owner.id} initial={listening} />
       ) : (
         listening.length > 0 && <FriendsNowPlaying userIds={[owner.id]} initial={listening} live={Boolean(viewer)} />
       )}
@@ -188,18 +191,18 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
       )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <Section icon={Mic2} title="Top artists of the last 4 weeks">
+        <Section icon={Mic2} title="Top artists" description={rangeLabel(last4Weeks)}>
           {artists.length ? (
             <TopList rounded items={artists.map((artist) => ({ ...artist, href: `/artist/${artist.id}` }))} />
           ) : (
-            <p className="text-sm text-muted">No plays in the last 4 weeks.</p>
+            <p className="text-sm text-muted">No plays in these 4 weeks.</p>
           )}
         </Section>
-        <Section icon={ListMusic} title="Top tracks of the last 4 weeks">
+        <Section icon={ListMusic} title="Top tracks" description={rangeLabel(last4Weeks)}>
           {tracks.length ? (
             <TopList items={tracks.map((track) => ({ ...track, href: `/track/${track.id}` }))} />
           ) : (
-            <p className="text-sm text-muted">No plays in the last 4 weeks.</p>
+            <p className="text-sm text-muted">No plays in these 4 weeks.</p>
           )}
         </Section>
       </div>

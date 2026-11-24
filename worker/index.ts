@@ -1,4 +1,5 @@
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { deleteUnconfirmedAccounts } from "@/lib/accounts";
 import { fetchMissingCatalogDetails, fetchMissingGenres } from "@/lib/catalog";
 import { db } from "@/lib/db";
 import { spotifyTokens, users, workerHeartbeat } from "@/lib/db/schema";
@@ -7,12 +8,17 @@ import { linkImportedTracks } from "@/lib/import/link";
 import { refreshNowPlaying, staleNowPlayingUsers } from "@/lib/now-playing";
 import { fetchMissingPictures } from "@/lib/pictures";
 import { SpotifyError } from "@/lib/spotify/api";
+import { pausedUntil, type SpotifyCall } from "@/lib/spotify/pauses";
+import { sendDueReminders } from "@/lib/reminders";
 import { refreshTopLists } from "@/lib/spotify/top";
 import { syncUser } from "@/lib/sync";
 
 const TICK_MS = 15_000;
-// How fresh "now playing" is kept for every user
-const NOW_PLAYING_MAX_AGE_MS = 30_000;
+// How fresh "now playing" is kept while someone listens, and while they don't.
+// A paused track disappears 2 minutes after it was last seen (getNowPlaying in
+// src/lib/social.ts), so idle has to stay under that.
+const PLAYING_MAX_AGE_MS = 30_000;
+const IDLE_MAX_AGE_MS = 90_000;
 // Spotify blocks catalog lookups for a day once too many are made, so they're
 // spread out: this is about 480 a day, under the 650 that got blocked
 const CATALOG_ROUND_MS = 15 * 60_000;
@@ -23,10 +29,14 @@ const TOP_LISTS_EVERY_MS = 6 * 60 * 60_000;
 const GENRES_PER_TICK = 40;
 // Deezer allows about 10 requests per second, and an artist can take three
 const PICTURES_PER_TICK = 40;
+// Sign-ups nobody confirmed are removed after a day, and import reminders go
+// out once a month; checking hourly is enough for both
+const CLEANUP_EVERY_MS = 60 * 60_000;
 
 let busy = false;
 let stopping = false;
 let nextCatalogRound = 0;
+let nextCleanup = 0;
 
 function stop() {
   stopping = true;
@@ -69,6 +79,13 @@ function usersDueForTopLists() {
     );
 }
 
+// Whether Spotify refused this kind of request, so the rest of them wait while
+// everything else carries on. The login server's refusals don't pause anything
+// and go up to main, which waits a bit.
+async function isPaused(error: unknown, call: SpotifyCall): Promise<boolean> {
+  return error instanceof SpotifyError && error.status === 429 && Boolean(await pausedUntil(call));
+}
+
 async function tick() {
   const now = new Date();
   await db
@@ -76,23 +93,39 @@ async function tick() {
     .values({ id: 1, beatAt: now })
     .onConflictDoUpdate({ target: workerHeartbeat.id, set: { beatAt: now } });
 
-  for (const userId of await staleNowPlayingUsers(NOW_PLAYING_MAX_AGE_MS)) {
+  for (const userId of await staleNowPlayingUsers(PLAYING_MAX_AGE_MS, IDLE_MAX_AGE_MS)) {
     if (stopping) return;
+    if (await pausedUntil("now-playing")) break;
     try {
       await refreshNowPlaying(userId);
     } catch (error) {
+      if (await isPaused(error, "now-playing")) break;
       if (error instanceof SpotifyError && error.status === 429) throw error;
       console.error(`Now playing failed for user ${userId}:`, error instanceof Error ? error.message : error);
     }
   }
   for (const user of await dueUsers()) {
     if (stopping) return;
-    const added = await syncUser(user.id);
-    if (added) console.log(`${user.displayName}: ${added} new plays`);
+    if (await pausedUntil("recently-played")) break;
+    try {
+      const added = await syncUser(user.id);
+      if (added) console.log(`${user.displayName}: ${added} new plays`);
+    } catch (error) {
+      if (await isPaused(error, "recently-played")) break;
+      throw error;
+    }
   }
   for (const user of await usersDueForTopLists()) {
     if (stopping) return;
+    if (await pausedUntil("top-lists")) break;
     await refreshTopLists(user.id);
+  }
+  if (Date.now() >= nextCleanup) {
+    nextCleanup = Date.now() + CLEANUP_EVERY_MS;
+    const deleted = await deleteUnconfirmedAccounts();
+    if (deleted) console.log(`Deleted ${deleted} sign-ups that were never confirmed`);
+    const reminded = await sendDueReminders();
+    if (reminded) console.log(`Sent ${reminded} import reminders`);
   }
   if (Date.now() >= nextCatalogRound) {
     nextCatalogRound = Date.now() + CATALOG_ROUND_MS;

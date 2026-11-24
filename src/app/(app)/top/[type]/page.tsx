@@ -9,7 +9,7 @@ import { TopList, type TopListItem } from "@/components/top-list";
 import { TopSummary } from "@/components/top-summary";
 import { formatDate } from "@/lib/dates";
 import { formatMinutes, formatNumber } from "@/lib/format";
-import { parseRange, rangeQuery, rangeStart, type Range } from "@/lib/ranges";
+import { parseRange, rangeLabel, rangeQuery, rangeStart, type Range } from "@/lib/ranges";
 import { requireUser } from "@/lib/session";
 import { getSpotifyTop, type SpotifyTopItem } from "@/lib/spotify/top";
 import {
@@ -19,6 +19,7 @@ import {
   getTopGenres,
   getCountsForIds,
   getPeriodTotals,
+  getStatsEnd,
   getTopTracks,
   type Sort,
 } from "@/lib/stats";
@@ -67,8 +68,9 @@ export default async function TopPage({ params, searchParams }: PageProps<"/top/
   if (!(rawType in TYPES)) notFound();
   const type = rawType as TopType;
   const user = await requireUser();
+  const { live, endsAt } = await getStatsEnd(user.id);
   // Without a range or sort in the URL, the user's defaults from Settings > Preferences
-  const range = parseRange(query, user.defaultRange as Range["key"]);
+  const range = parseRange(query, user.defaultRange as Range["key"], endsAt);
   const sort: Sort = query.sort === "minutes" || query.sort === "plays" ? query.sort : (user.defaultSort as Sort);
   const forceOwnData = query.source === "stats";
 
@@ -78,7 +80,7 @@ export default async function TopPage({ params, searchParams }: PageProps<"/top/
 
   // Until we have history for the range, show Spotify's own ranking
   const spotifyTerm = range.key !== "custom" ? range.spotifyTerm : null;
-  const useSpotify = !covered && !forceOwnData && spotifyTerm && (type === "tracks" || type === "artists");
+  const useSpotify = live && !covered && !forceOwnData && spotifyTerm && (type === "tracks" || type === "artists");
   const spotifyItems = useSpotify ? await getSpotifyTop(user.id, type, spotifyTerm).catch(() => null) : null;
 
   const [ranked, totals] = await Promise.all([
@@ -89,7 +91,7 @@ export default async function TopPage({ params, searchParams }: PageProps<"/top/
   const href = TYPES[type].href;
   const linked = items.map((item) => ({ ...item, href: href ? href(item.id) : undefined }));
   const [first] = linked;
-  const periodLabel = range.key === "custom" ? range.label : `Last ${range.label.toLowerCase()}`.replace("Last all time", "All time");
+  const periodLabel = rangeLabel(range);
   const distinct = {
     tracks: { label: "Tracks", value: totals.tracks },
     artists: { label: "Artists", value: totals.artists },

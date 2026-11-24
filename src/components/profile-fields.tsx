@@ -70,7 +70,20 @@ const CHECK_LABELS: Record<UsernameCheck, string> = {
 };
 
 // The profile link, checked as you type: is it free, and is it allowed?
-export function UsernameField({ host, defaultValue }: { host: string; defaultValue: string }) {
+// Settings checks against the viewer's own link; sign-up passes its own check.
+export function UsernameField({
+  host,
+  defaultValue,
+  label = "Profile link",
+  hint = "Old links keep working when you change it.",
+  check: checkValue = checkUsername,
+}: {
+  host: string;
+  defaultValue: string;
+  label?: string;
+  hint?: string;
+  check?: (value: string) => Promise<UsernameCheck>;
+}) {
   const id = useId();
   const [value, setValue] = useState(defaultValue);
   const [result, setResult] = useState<{ for: string; check: UsernameCheck } | null>({ for: defaultValue, check: "current" });
@@ -78,12 +91,12 @@ export function UsernameField({ host, defaultValue }: { host: string; defaultVal
   useEffect(() => {
     if (!value) return;
     const timer = setTimeout(() => {
-      checkUsername(value)
+      checkValue(value)
         .then((check) => setResult({ for: value, check }))
         .catch(() => {});
     }, 350);
     return () => clearTimeout(timer);
-  }, [value]);
+  }, [value, checkValue]);
 
   // A result for an older value means a check is still on its way
   const check = value && result?.for === value ? result.check : null;
@@ -92,7 +105,7 @@ export function UsernameField({ host, defaultValue }: { host: string; defaultVal
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="block text-sm font-medium">
-        Profile link
+        {label}
       </label>
       <div className={`flex h-12 items-center gap-2 pr-3 ${fieldClass} focus-within:ring-accent/60`}>
         <span className="shrink-0 text-subtle select-none">{host}/u/</span>
@@ -126,7 +139,7 @@ export function UsernameField({ host, defaultValue }: { host: string; defaultVal
         <span className="text-xs text-subtle">
           {check === "invalid"
             ? "3 to 24 lowercase letters, digits, dots or underscores, starting with a letter or digit."
-            : "Old links keep working when you change it."}
+            : hint}
         </span>
         <Counter length={value.length} max={USERNAME_MAX} />
       </div>

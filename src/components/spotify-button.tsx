@@ -13,14 +13,15 @@ export function SpotifyIcon({ className }: { className?: string }) {
 
 // "Continue with Spotify", in Spotify's own green as their brand guidelines
 // ask for login buttons. A plain link: the route redirects to Spotify, so it
-// must not be prefetched.
-export function SpotifyLoginButton() {
+// must not be prefetched. `compact` when it sits below the email login.
+export function SpotifyLoginButton({ compact = false }: { compact?: boolean }) {
+  const sizing = compact ? "h-12 gap-2.5 text-[15px]" : "h-14 gap-3 text-[17px]";
   return (
     <a
       href="/api/auth/login"
-      className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-[#1DB954] px-6 text-[17px] font-bold text-black transition hover:bg-[#1ed760] active:scale-[0.99]"
+      className={`flex w-full items-center justify-center rounded-full bg-[#1DB954] px-6 font-bold text-black transition hover:bg-[#1ed760] active:scale-[0.99] ${sizing}`}
     >
-      <SpotifyIcon className="size-6" />
+      <SpotifyIcon className={compact ? "size-5" : "size-6"} />
       Continue with Spotify
     </a>
   );
